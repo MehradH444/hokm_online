@@ -1,1 +1,3048 @@
+/* =========================================================
+   HOKM ONLINE
+   style.css
+   نسخه کامل رابط کاربری بازی حکم
+   طراحی موبایل‌محور + دسکتاپ
+   ========================================================= */
 
+
+/* =========================================================
+   1. RESET
+   ========================================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    width: 100%;
+    min-height: 100%;
+    scroll-behavior: smooth;
+}
+
+body {
+    width: 100%;
+    min-height: 100vh;
+    font-family:
+        Tahoma,
+        Arial,
+        sans-serif;
+    background:
+        radial-gradient(
+            circle at top,
+            #253b67 0%,
+            #111a2e 42%,
+            #080d18 100%
+        );
+    color: #ffffff;
+    direction: rtl;
+    overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button {
+    border: none;
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+input {
+    outline: none;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+
+/* =========================================================
+   2. ROOT VARIABLES
+   ========================================================= */
+
+:root {
+
+    --bg-main: #080d18;
+
+    --bg-secondary: #10182a;
+
+    --bg-card: rgba(
+        255,
+        255,
+        255,
+        0.07
+    );
+
+    --bg-card-strong: rgba(
+        255,
+        255,
+        255,
+        0.11
+    );
+
+    --border: rgba(
+        255,
+        255,
+        255,
+        0.1
+    );
+
+    --gold: #f7c948;
+
+    --gold-dark: #c99820;
+
+    --green: #35d07f;
+
+    --green-dark: #159c59;
+
+    --red: #ff4f61;
+
+    --blue: #4c8dff;
+
+    --purple: #8b5cf6;
+
+    --text: #ffffff;
+
+    --text-secondary: #aab5cc;
+
+    --shadow:
+        0 15px 40px
+        rgba(
+            0,
+            0,
+            0,
+            0.3
+        );
+
+    --radius: 18px;
+
+    --transition:
+        0.2s ease;
+}
+
+
+/* =========================================================
+   3. APP
+   ========================================================= */
+
+#app {
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+}
+
+
+/* =========================================================
+   4. SCREEN SYSTEM
+   ========================================================= */
+
+.screen {
+    display: none;
+    width: 100%;
+    min-height: 100vh;
+    padding-bottom: 90px;
+}
+
+.screen.active-screen {
+    display: block;
+}
+
+.screen-inner {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 18px;
+}
+
+
+/* =========================================================
+   5. HEADER
+   ========================================================= */
+
+.app-header {
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    background:
+        rgba(
+            8,
+            13,
+            24,
+            0.86
+        );
+    border-bottom:
+        1px solid
+        var(--border);
+}
+
+.header-inner {
+    max-width: 1100px;
+    min-height: 68px;
+    margin: 0 auto;
+    padding: 10px 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 19px;
+    font-weight: 900;
+}
+
+.logo-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--gold),
+            #e8a91e
+        );
+
+    color: #111827;
+    box-shadow:
+        0 8px 25px
+        rgba(
+            247,
+            201,
+            72,
+            0.25
+        );
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon-button {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        var(--bg-card);
+
+    color: white;
+
+    border:
+        1px solid
+        var(--border);
+
+    transition:
+        transform var(--transition),
+        background var(--transition);
+}
+
+.icon-button:hover {
+    background:
+        var(--bg-card-strong);
+
+    transform:
+        translateY(-2px);
+}
+
+
+/* =========================================================
+   6. COIN BALANCE
+   ========================================================= */
+
+.coin-balance {
+    min-height: 40px;
+    padding: 7px 12px;
+    border-radius: 13px;
+
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    background:
+        rgba(
+            247,
+            201,
+            72,
+            0.12
+        );
+
+    border:
+        1px solid
+        rgba(
+            247,
+            201,
+            72,
+            0.25
+        );
+
+    color: var(--gold);
+
+    font-weight: 800;
+}
+
+.coin-icon {
+    font-size: 18px;
+}
+
+
+/* =========================================================
+   7. HOME HERO
+   ========================================================= */
+
+.hero-section {
+    padding-top: 30px;
+}
+
+.hero-card {
+    position: relative;
+    overflow: hidden;
+
+    padding: 30px 22px;
+
+    border-radius: 26px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                72,
+                119,
+                205,
+                0.27
+            ),
+            rgba(
+                126,
+                74,
+                201,
+                0.16
+            )
+        );
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    box-shadow:
+        var(--shadow);
+}
+
+.hero-card::before {
+    content: "";
+    position: absolute;
+
+    width: 190px;
+    height: 190px;
+
+    border-radius: 50%;
+
+    top: -100px;
+    left: -60px;
+
+    background:
+        rgba(
+            247,
+            201,
+            72,
+            0.12
+        );
+
+    filter: blur(5px);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-title {
+    font-size: clamp(
+        28px,
+        7vw,
+        48px
+    );
+
+    line-height: 1.25;
+    font-weight: 1000;
+
+    margin-bottom: 12px;
+}
+
+.hero-title span {
+    color: var(--gold);
+}
+
+.hero-description {
+    max-width: 650px;
+
+    color:
+        var(--text-secondary);
+
+    font-size: 15px;
+
+    line-height: 1.9;
+
+    margin-bottom: 24px;
+}
+
+
+/* =========================================================
+   8. MAIN BUTTONS
+   ========================================================= */
+
+.primary-button,
+.secondary-button,
+.danger-button {
+    min-height: 48px;
+    padding: 0 18px;
+
+    border-radius: 14px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    font-weight: 900;
+
+    transition:
+        transform var(--transition),
+        box-shadow var(--transition),
+        opacity var(--transition);
+}
+
+.primary-button {
+    background:
+        linear-gradient(
+            135deg,
+            var(--gold),
+            #e5a91f
+        );
+
+    color: #17120a;
+
+    box-shadow:
+        0 10px 25px
+        rgba(
+            247,
+            201,
+            72,
+            0.2
+        );
+}
+
+.secondary-button {
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    color: white;
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.danger-button {
+    background:
+        linear-gradient(
+            135deg,
+            #ff5a6c,
+            #db3044
+        );
+
+    color: white;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.danger-button:hover {
+    transform:
+        translateY(-2px);
+}
+
+.primary-button:active,
+.secondary-button:active,
+.danger-button:active {
+    transform:
+        scale(0.98);
+}
+
+.full-width {
+    width: 100%;
+}
+
+
+/* =========================================================
+   9. HOME ACTIONS
+   ========================================================= */
+
+.action-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 12px;
+
+    margin-top: 20px;
+}
+
+.action-card {
+    min-height: 120px;
+
+    padding: 18px;
+
+    border-radius: 19px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    color: white;
+
+    text-align: right;
+
+    transition:
+        transform var(--transition),
+        background var(--transition);
+}
+
+.action-card:hover {
+    transform:
+        translateY(-4px);
+
+    background:
+        var(--bg-card-strong);
+}
+
+.action-card-icon {
+    font-size: 30px;
+    margin-bottom: 12px;
+}
+
+.action-card-title {
+    font-weight: 900;
+    margin-bottom: 6px;
+}
+
+.action-card-description {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+
+    line-height: 1.7;
+}
+
+
+/* =========================================================
+   10. SECTION TITLES
+   ========================================================= */
+
+.section-title {
+    margin-top: 26px;
+    margin-bottom: 14px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+}
+
+.section-title h2 {
+    font-size: 20px;
+    font-weight: 950;
+}
+
+.section-title span {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   11. GENERIC CARDS
+   ========================================================= */
+
+.card {
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        var(--radius);
+
+    box-shadow:
+        0 10px 30px
+        rgba(
+            0,
+            0,
+            0,
+            0.12
+        );
+}
+
+.card-padding {
+    padding: 18px;
+}
+
+
+/* =========================================================
+   12. PLAYER PROFILE CARD
+   ========================================================= */
+
+.profile-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    padding: 17px;
+
+    border-radius: 19px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.avatar {
+    width: 52px;
+    height: 52px;
+
+    flex: 0 0 auto;
+
+    border-radius: 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            #415d91,
+            #7c4eb4
+        );
+
+    font-size: 25px;
+}
+
+.profile-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.profile-info strong {
+    display: block;
+
+    font-size: 15px;
+
+    margin-bottom: 5px;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+.profile-info span {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   13. STATS
+   ========================================================= */
+
+.stats-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            1fr
+        );
+
+    gap: 10px;
+}
+
+.stat-box {
+    padding: 16px 10px;
+
+    text-align: center;
+
+    border-radius: 16px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.05
+        );
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.stat-box strong {
+    display: block;
+
+    font-size: 20px;
+
+    color:
+        var(--gold);
+
+    margin-bottom: 5px;
+}
+
+.stat-box span {
+    color:
+        var(--text-secondary);
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   14. BOTTOM NAVIGATION
+   ========================================================= */
+
+.bottom-navigation {
+    position: fixed;
+
+    z-index: 200;
+
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    height: 74px;
+
+    padding:
+        8px
+        10px
+        calc(
+            8px +
+            env(
+                safe-area-inset-bottom
+            )
+        );
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            1fr
+        );
+
+    gap: 5px;
+
+    background:
+        rgba(
+            8,
+            13,
+            24,
+            0.94
+        );
+
+    border-top:
+        1px solid
+        var(--border);
+
+    backdrop-filter:
+        blur(18px);
+
+    -webkit-backdrop-filter:
+        blur(18px);
+}
+
+.nav-item {
+    min-width: 0;
+
+    border-radius: 14px;
+
+    background:
+        transparent;
+
+    color:
+        var(--text-secondary);
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 4px;
+
+    font-size: 10px;
+
+    transition:
+        color var(--transition),
+        background var(--transition);
+}
+
+.nav-item span:first-child {
+    font-size: 20px;
+}
+
+.nav-item.active {
+    color:
+        var(--gold);
+
+    background:
+        rgba(
+            247,
+            201,
+            72,
+            0.08
+        );
+}
+
+
+/* =========================================================
+   15. PAGE HEADER
+   ========================================================= */
+
+.page-header {
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    padding-top: 18px;
+
+    margin-bottom: 20px;
+}
+
+.back-button {
+    width: 42px;
+    height: 42px;
+
+    flex: 0 0 auto;
+
+    border-radius: 13px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    color: white;
+}
+
+.page-header-text h1 {
+    font-size: 23px;
+    font-weight: 950;
+}
+
+.page-header-text p {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+
+    margin-top: 5px;
+}
+
+
+/* =========================================================
+   16. FORM
+   ========================================================= */
+
+.form-group {
+    margin-bottom: 17px;
+}
+
+.form-label {
+    display: block;
+
+    color:
+        #dfe6f5;
+
+    font-size: 13px;
+
+    font-weight: 800;
+
+    margin-bottom: 8px;
+}
+
+.form-input,
+.modal-input {
+    width: 100%;
+
+    min-height: 50px;
+
+    padding:
+        0 14px;
+
+    border-radius: 14px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.06
+        );
+
+    border:
+        1px solid
+        var(--border);
+
+    color: white;
+
+    direction: rtl;
+}
+
+.form-input::placeholder,
+.modal-input::placeholder {
+    color:
+        #78849b;
+}
+
+.form-input:focus,
+.modal-input:focus {
+    border-color:
+        rgba(
+            247,
+            201,
+            72,
+            0.55
+        );
+
+    box-shadow:
+        0 0 0 3px
+        rgba(
+            247,
+            201,
+            72,
+            0.08
+        );
+}
+
+
+/* =========================================================
+   17. ROOM
+   ========================================================= */
+
+.room-code-card {
+    padding: 20px;
+
+    text-align: center;
+
+    border-radius: 20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                247,
+                201,
+                72,
+                0.13
+            ),
+            rgba(
+                255,
+                255,
+                255,
+                0.04
+            )
+        );
+
+    border:
+        1px solid
+        rgba(
+            247,
+            201,
+            72,
+            0.2
+        );
+}
+
+.room-code-label {
+    display: block;
+
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+
+    margin-bottom: 8px;
+}
+
+.room-code {
+    display: block;
+
+    direction: ltr;
+
+    letter-spacing: 7px;
+
+    font-size: 31px;
+
+    font-weight: 1000;
+
+    color:
+        var(--gold);
+
+    margin-bottom: 14px;
+}
+
+.copy-code-button {
+    min-height: 42px;
+
+    padding: 0 16px;
+
+    border-radius: 12px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    border:
+        1px solid
+        var(--border);
+
+    color: white;
+}
+
+.players-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            1fr
+        );
+
+    gap: 10px;
+}
+
+.room-player {
+    min-height: 96px;
+
+    padding: 14px;
+
+    border-radius: 17px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.empty-player {
+    opacity: 0.6;
+}
+
+.room-player-avatar {
+    width: 40px;
+    height: 40px;
+
+    flex: 0 0 auto;
+
+    border-radius: 13px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    font-size: 18px;
+}
+
+.room-player-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.room-player-info strong {
+    display: block;
+
+    font-size: 12px;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+}
+
+.room-player-info span {
+    display: block;
+
+    color:
+        var(--text-secondary);
+
+    font-size: 10px;
+
+    margin-top: 4px;
+}
+
+.ready-badge {
+    padding:
+        5px 7px;
+
+    border-radius: 8px;
+
+    background:
+        rgba(
+            53,
+            208,
+            127,
+            0.12
+        );
+
+    color:
+        var(--green);
+
+    font-size: 9px;
+
+    font-weight: 900;
+}
+
+
+/* =========================================================
+   18. GAME TABLE
+   ========================================================= */
+
+.game-screen {
+    padding-bottom: 0;
+    min-height: 100vh;
+}
+
+.game-container {
+    width: 100%;
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+
+    padding:
+        10px;
+
+    background:
+        radial-gradient(
+            circle at center,
+            #1b6b48 0%,
+            #125339 45%,
+            #0c3929 100%
+        );
+}
+
+.game-topbar {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 8px;
+
+    padding:
+        6px 2px;
+}
+
+.game-menu-button {
+    width: 42px;
+    height: 42px;
+
+    border-radius: 13px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.24
+        );
+
+    color: white;
+}
+
+.game-score {
+    min-width: 170px;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding:
+        8px 14px;
+
+    border-radius: 15px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.23
+        );
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+}
+
+.score-team {
+    text-align: center;
+}
+
+.score-team span {
+    display: block;
+
+    font-size: 9px;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.65
+        );
+}
+
+.score-team strong {
+    font-size: 20px;
+}
+
+.score-divider {
+    opacity: 0.5;
+}
+
+
+/* =========================================================
+   19. GAME TABLE CENTER
+   ========================================================= */
+
+.chess-like-table,
+.card-table {
+    position: relative;
+
+    width: 100%;
+
+    max-width: 680px;
+
+    margin:
+        12px auto;
+
+    aspect-ratio: 1 / 1;
+
+    border-radius: 42%;
+
+    background:
+        radial-gradient(
+            circle,
+            #247f54 0%,
+            #1b6947 58%,
+            #125037 100%
+        );
+
+    border:
+        7px solid
+        rgba(
+            78,
+            36,
+            13,
+            0.9
+        );
+
+    box-shadow:
+        inset
+        0 0 45px
+        rgba(
+            0,
+            0,
+            0,
+            0.3
+        ),
+        0 15px 40px
+        rgba(
+            0,
+            0,
+            0,
+            0.25
+        );
+
+    flex: 1;
+}
+
+.table-center {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+
+    width: 33%;
+
+    aspect-ratio: 1;
+
+    border-radius: 50%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.11
+        );
+}
+
+.turn-message {
+    text-align: center;
+
+    font-size: 12px;
+
+    font-weight: 900;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.9
+        );
+}
+
+
+/* =========================================================
+   20. PLAYER POSITIONS
+   ========================================================= */
+
+.table-player {
+    position: absolute;
+
+    width: 95px;
+
+    padding: 7px;
+
+    border-radius: 14px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.28
+        );
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+
+    text-align: center;
+
+    z-index: 10;
+}
+
+.table-player.top-player {
+    top: 8px;
+    left: 50%;
+
+    transform:
+        translateX(-50%);
+}
+
+.table-player.bottom-player {
+    bottom: 8px;
+    left: 50%;
+
+    transform:
+        translateX(-50%);
+}
+
+.table-player.left-player {
+    left: 5px;
+    top: 50%;
+
+    transform:
+        translateY(-50%);
+}
+
+.table-player.right-player {
+    right: 5px;
+    top: 50%;
+
+    transform:
+        translateY(-50%);
+}
+
+.table-avatar {
+    width: 35px;
+    height: 35px;
+
+    margin:
+        0 auto 4px;
+
+    border-radius: 11px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            #45689d,
+            #7e4ea9
+        );
+}
+
+.table-player-name {
+    display: block;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 9px;
+
+    font-weight: 800;
+}
+
+.table-card-count {
+    display: block;
+
+    color:
+        var(--gold);
+
+    font-size: 8px;
+
+    margin-top: 2px;
+}
+
+
+/* =========================================================
+   21. PLAYED CARDS
+   ========================================================= */
+
+.played-card {
+    position: absolute;
+
+    width: 65px;
+    height: 91px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    z-index: 20;
+}
+
+.played-card.bottom-card {
+    left: 50%;
+    top: 67%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+.played-card.top-card {
+    left: 50%;
+    top: 33%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+.played-card.left-card {
+    left: 34%;
+    top: 50%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+.played-card.right-card {
+    left: 66%;
+    top: 50%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+
+/* =========================================================
+   22. PLAYING CARDS
+   ========================================================= */
+
+.playing-card {
+    position: relative;
+
+    width: 58px;
+    height: 82px;
+
+    flex: 0 0 auto;
+
+    border-radius: 9px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #ffffff,
+            #e8edf5
+        );
+
+    border:
+        1px solid
+        rgba(
+            0,
+            0,
+            0,
+            0.12
+        );
+
+    color: #121826;
+
+    box-shadow:
+        0 7px 13px
+        rgba(
+            0,
+            0,
+            0,
+            0.22
+        );
+
+    overflow: hidden;
+
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.playing-card.playable:hover {
+    transform:
+        translateY(-9px);
+
+    box-shadow:
+        0 14px 20px
+        rgba(
+            0,
+            0,
+            0,
+            0.3
+        );
+}
+
+.playing-card.disabled {
+    opacity: 0.7;
+}
+
+.red-card {
+    color: #d9364b;
+}
+
+.black-card {
+    color: #111827;
+}
+
+.card-corner {
+    position: absolute;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    line-height: 1;
+
+    font-size: 11px;
+
+    gap: 2px;
+}
+
+.top-corner {
+    top: 6px;
+    left: 6px;
+}
+
+.bottom-corner {
+    bottom: 6px;
+    right: 6px;
+
+    transform:
+        rotate(180deg);
+}
+
+.card-corner strong {
+    font-size: 13px;
+}
+
+.card-center-symbol {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+
+    font-size: 25px;
+}
+
+
+/* =========================================================
+   23. PLAYER HAND
+   ========================================================= */
+
+.player-hand-container {
+    width: 100%;
+
+    overflow-x: auto;
+
+    overflow-y: hidden;
+
+    padding:
+        5px 4px
+        16px;
+
+    scrollbar-width: none;
+}
+
+.player-hand-container::-webkit-scrollbar {
+    display: none;
+}
+
+.player-hand {
+    min-width: max-content;
+
+    display: flex;
+
+    justify-content: center;
+
+    gap: 3px;
+
+    direction: ltr;
+}
+
+.player-hand .playing-card {
+    margin-left: -12px;
+}
+
+.player-hand .playing-card:first-child {
+    margin-left: 0;
+}
+
+.player-hand .playing-card.playable {
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   24. GAME STATUS
+   ========================================================= */
+
+.game-status-bar {
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 10px;
+
+    padding:
+        7px 0 4px;
+}
+
+.trump-display {
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    padding:
+        6px 11px;
+
+    border-radius: 11px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.22
+        );
+
+    font-size: 11px;
+}
+
+.trump-display strong {
+    color:
+        var(--gold);
+
+    font-size: 17px;
+}
+
+
+/* =========================================================
+   25. TRUMP SELECTION
+   ========================================================= */
+
+.trump-container {
+    max-width: 650px;
+
+    margin:
+        40px auto;
+
+    padding:
+        24px 18px;
+
+    text-align: center;
+
+    border-radius: 25px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    box-shadow:
+        var(--shadow);
+}
+
+.trump-title {
+    font-size: 25px;
+
+    font-weight: 1000;
+
+    margin-bottom: 8px;
+}
+
+.trump-description {
+    color:
+        var(--text-secondary);
+
+    font-size: 13px;
+
+    line-height: 1.8;
+
+    margin-bottom: 22px;
+}
+
+.suits-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            1fr
+        );
+
+    gap: 12px;
+}
+
+.suit-button {
+    min-height: 105px;
+
+    border-radius: 18px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.06
+        );
+
+    border:
+        1px solid
+        var(--border);
+
+    color: white;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 7px;
+
+    transition:
+        transform var(--transition),
+        background var(--transition);
+}
+
+.suit-button:hover {
+    transform:
+        translateY(-3px);
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+}
+
+.suit-symbol {
+    font-size: 38px;
+}
+
+.suit-name {
+    font-size: 13px;
+
+    font-weight: 900;
+}
+
+.suit-red {
+    color:
+        #ff5367;
+}
+
+.suit-black {
+    color:
+        #ffffff;
+}
+
+
+/* =========================================================
+   26. SHOP
+   ========================================================= */
+
+.shop-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 12px;
+}
+
+.shop-item {
+    padding: 16px;
+
+    border-radius: 19px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    text-align: center;
+}
+
+.shop-item-icon {
+    font-size: 40px;
+
+    margin-bottom: 10px;
+}
+
+.shop-item-title {
+    font-size: 14px;
+
+    font-weight: 900;
+
+    margin-bottom: 5px;
+}
+
+.shop-item-description {
+    color:
+        var(--text-secondary);
+
+    font-size: 10px;
+
+    line-height: 1.6;
+
+    margin-bottom: 13px;
+}
+
+.shop-buy-button {
+    width: 100%;
+
+    min-height: 40px;
+
+    border-radius: 11px;
+
+    background:
+        rgba(
+            247,
+            201,
+            72,
+            0.12
+        );
+
+    border:
+        1px solid
+        rgba(
+            247,
+            201,
+            72,
+            0.2
+        );
+
+    color:
+        var(--gold);
+
+    font-weight: 900;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   27. LEADERBOARD
+   ========================================================= */
+
+.leaderboard-tabs {
+    display: flex;
+
+    gap: 8px;
+
+    margin-bottom: 15px;
+}
+
+.leaderboard-tab {
+    flex: 1;
+
+    min-height: 43px;
+
+    border-radius: 13px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+
+    color:
+        var(--text-secondary);
+}
+
+.leaderboard-tab.active {
+    color:
+        #17120a;
+
+    background:
+        var(--gold);
+}
+
+.leaderboard-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+.leaderboard-row {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    min-height: 64px;
+
+    padding:
+        10px 13px;
+
+    border-radius: 15px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.leaderboard-rank {
+    width: 30px;
+
+    text-align: center;
+
+    color:
+        var(--gold);
+
+    font-weight: 1000;
+}
+
+.leaderboard-avatar {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 12px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+}
+
+.leaderboard-name {
+    flex: 1;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 12px;
+
+    font-weight: 800;
+}
+
+.leaderboard-score {
+    color:
+        var(--gold);
+
+    font-weight: 900;
+
+    font-size: 12px;
+}
+
+
+/* =========================================================
+   28. PROFILE PAGE
+   ========================================================= */
+
+.profile-large {
+    text-align: center;
+
+    padding:
+        28px 18px;
+
+    border-radius: 23px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.profile-large-avatar {
+    width: 90px;
+    height: 90px;
+
+    margin:
+        0 auto 14px;
+
+    border-radius: 28px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    font-size: 42px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #45689d,
+            #7e4ea9
+        );
+
+    box-shadow:
+        0 14px 30px
+        rgba(
+            0,
+            0,
+            0,
+            0.2
+        );
+}
+
+.profile-large h2 {
+    font-size: 22px;
+
+    margin-bottom: 6px;
+}
+
+.profile-large p {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+}
+
+.profile-actions {
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 10px;
+
+    margin-top: 14px;
+}
+
+
+/* =========================================================
+   29. SETTINGS
+   ========================================================= */
+
+.switch-row {
+    min-height: 58px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    padding:
+        12px 0;
+
+    border-bottom:
+        1px solid
+        var(--border);
+}
+
+.switch-row span:first-child {
+    font-size: 13px;
+
+    font-weight: 800;
+}
+
+.switch-row input {
+    display: none;
+}
+
+.switch {
+    width: 48px;
+    height: 27px;
+
+    position: relative;
+
+    border-radius: 30px;
+
+    background:
+        #38445b;
+
+    cursor: pointer;
+}
+
+.switch::after {
+    content: "";
+
+    position: absolute;
+
+    width: 21px;
+    height: 21px;
+
+    top: 3px;
+    right: 3px;
+
+    border-radius: 50%;
+
+    background: white;
+
+    transition:
+        transform 0.2s ease;
+}
+
+.switch-row input:checked + .switch {
+    background:
+        var(--green);
+}
+
+.switch-row input:checked + .switch::after {
+    transform:
+        translateX(-21px);
+}
+
+
+/* =========================================================
+   30. MODAL
+   ========================================================= */
+
+#modalOverlay {
+    position: fixed;
+
+    z-index: 500;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 18px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.68
+        );
+
+    backdrop-filter:
+        blur(7px);
+
+    -webkit-backdrop-filter:
+        blur(7px);
+}
+
+#modalOverlay.hidden {
+    display: none;
+}
+
+.modal {
+    width: 100%;
+
+    max-width: 430px;
+
+    max-height: 90vh;
+
+    overflow-y: auto;
+
+    padding: 21px;
+
+    border-radius: 23px;
+
+    background:
+        #141d31;
+
+    border:
+        1px solid
+        var(--border);
+
+    box-shadow:
+        0 30px 80px
+        rgba(
+            0,
+            0,
+            0,
+            0.45
+        );
+}
+
+.modal-header {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    margin-bottom: 17px;
+}
+
+.modal-header h2 {
+    font-size: 20px;
+}
+
+.close-modal {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 12px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.07
+        );
+
+    color: white;
+}
+
+.modal-label {
+    display: block;
+
+    margin:
+        12px 0 7px;
+
+    font-size: 12px;
+
+    font-weight: 800;
+}
+
+
+/* =========================================================
+   31. TOAST
+   ========================================================= */
+
+#toast {
+    position: fixed;
+
+    z-index: 1000;
+
+    left: 50%;
+
+    bottom: 88px;
+
+    transform:
+        translate(
+            -50%,
+            25px
+        );
+
+    min-width: 230px;
+
+    max-width: calc(
+        100vw - 30px
+    );
+
+    padding:
+        12px 15px;
+
+    border-radius: 14px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    background:
+        rgba(
+            20,
+            29,
+            49,
+            0.96
+        );
+
+    border:
+        1px solid
+        var(--border);
+
+    box-shadow:
+        var(--shadow);
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+
+#toast.show {
+    opacity: 1;
+
+    transform:
+        translate(
+            -50%,
+            0
+        );
+}
+
+#toastIcon {
+    font-size: 18px;
+}
+
+#toastMessage {
+    font-size: 12px;
+
+    font-weight: 700;
+
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   32. LOADING
+   ========================================================= */
+
+#loadingOverlay {
+    position: fixed;
+
+    z-index: 900;
+
+    inset: 0;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 15px;
+
+    background:
+        rgba(
+            6,
+            11,
+            20,
+            0.82
+        );
+
+    backdrop-filter:
+        blur(8px);
+}
+
+#loadingOverlay.hidden {
+    display: none;
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+
+    border-radius: 50%;
+
+    border:
+        4px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    border-top-color:
+        var(--gold);
+
+    animation:
+        spin 0.8s linear infinite;
+}
+
+#loadingMessage {
+    color:
+        var(--text-secondary);
+
+    font-size: 13px;
+}
+
+@keyframes spin {
+
+    from {
+        transform:
+            rotate(0deg);
+    }
+
+    to {
+        transform:
+            rotate(360deg);
+    }
+}
+
+
+/* =========================================================
+   33. RESULT MODAL
+   ========================================================= */
+
+.result-modal {
+    text-align: center;
+}
+
+.result-icon {
+    font-size: 54px;
+
+    margin-bottom: 10px;
+}
+
+.result-modal h2 {
+    font-size: 25px;
+
+    margin-bottom: 8px;
+}
+
+.result-modal p {
+    color:
+        var(--text-secondary);
+
+    font-size: 12px;
+
+    line-height: 1.8;
+
+    margin-bottom: 20px;
+}
+
+.result-score {
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 10px;
+
+    margin-bottom: 13px;
+}
+
+.result-score > div {
+    padding: 14px;
+
+    border-radius: 15px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.05
+        );
+}
+
+.result-score span {
+    display: block;
+
+    color:
+        var(--text-secondary);
+
+    font-size: 10px;
+
+    margin-bottom: 6px;
+}
+
+.result-score strong {
+    font-size: 25px;
+
+    color:
+        var(--gold);
+}
+
+.result-reward {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding:
+        12px 14px;
+
+    margin-bottom: 15px;
+
+    border-radius: 13px;
+
+    background:
+        rgba(
+            247,
+            201,
+            72,
+            0.08
+        );
+
+    color:
+        var(--text-secondary);
+}
+
+.result-reward strong {
+    color:
+        var(--gold);
+}
+
+
+/* =========================================================
+   34. CHAT
+   ========================================================= */
+
+.chat-messages {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+    margin-bottom: 12px;
+
+    max-height: 280px;
+
+    overflow-y: auto;
+}
+
+.chat-message {
+    padding:
+        10px 12px;
+
+    border-radius: 12px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.05
+        );
+
+    font-size: 11px;
+
+    line-height: 1.7;
+}
+
+.chat-message strong {
+    color:
+        var(--gold);
+}
+
+.chat-input-row {
+    display: grid;
+
+    grid-template-columns:
+        1fr auto;
+
+    gap: 8px;
+}
+
+
+/* =========================================================
+   35. GAME MENU MODAL
+================================================================ */
+
+.game-menu-modal h2 {
+    font-size: 21px;
+
+    margin-bottom: 16px;
+}
+
+.game-menu-modal
+.primary-button,
+.game-menu-modal
+.danger-button {
+    margin-bottom: 9px;
+}
+
+
+/* =========================================================
+   36. EMPTY STATE
+================================================================ */
+
+.empty-state {
+    padding:
+        35px 20px;
+
+    text-align: center;
+
+    border-radius: 19px;
+
+    background:
+        var(--bg-card);
+
+    border:
+        1px solid
+        var(--border);
+}
+
+.empty-state-icon {
+    font-size: 40px;
+
+    margin-bottom: 10px;
+}
+
+.empty-state h3 {
+    font-size: 16px;
+
+    margin-bottom: 7px;
+}
+
+.empty-state p {
+    color:
+        var(--text-secondary);
+
+    font-size: 11px;
+
+    line-height: 1.8;
+}
+
+
+/* =========================================================
+   37. UTILITY
+================================================================ */
+
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.mt-10 {
+    margin-top: 10px;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+.mb-10 {
+    margin-bottom: 10px;
+}
+
+.mb-15 {
+    margin-bottom: 15px;
+}
+
+.mb-20 {
+    margin-bottom: 20px;
+}
+
+
+/* =========================================================
+   38. DESKTOP
+================================================================ */
+
+@media (
+    min-width: 700px
+) {
+
+    .screen {
+        padding-bottom: 30px;
+    }
+
+    .bottom-navigation {
+        position: static;
+
+        max-width: 1100px;
+
+        margin:
+            0 auto 20px;
+
+        border:
+            1px solid
+            var(--border);
+
+        border-radius: 18px;
+
+        height: 70px;
+    }
+
+    .hero-card {
+        padding:
+            45px 40px;
+    }
+
+    .action-grid {
+        grid-template-columns:
+            repeat(
+                4,
+                1fr
+            );
+    }
+
+    .shop-grid {
+        grid-template-columns:
+            repeat(
+                4,
+                1fr
+            );
+    }
+
+    .players-grid {
+        grid-template-columns:
+            repeat(
+                4,
+                1fr
+            );
+    }
+
+    .suits-grid {
+        grid-template-columns:
+            repeat(
+                4,
+                1fr
+            );
+    }
+
+    .playing-card {
+        width: 72px;
+        height: 102px;
+    }
+
+    .card-center-symbol {
+        font-size: 31px;
+    }
+
+    .game-container {
+        padding:
+            14px 24px;
+    }
+
+    .game-score {
+        min-width: 220px;
+    }
+}
+
+
+/* =========================================================
+   39. SMALL MOBILE
+================================================================ */
+
+@media (
+    max-width: 360px
+) {
+
+    .screen-inner {
+        padding:
+            14px 12px;
+    }
+
+    .hero-card {
+        padding:
+            23px 16px;
+    }
+
+    .hero-title {
+        font-size: 27px;
+    }
+
+    .action-grid {
+        gap: 8px;
+    }
+
+    .action-card {
+        min-height: 108px;
+        padding: 13px;
+    }
+
+    .action-card-icon {
+        font-size: 25px;
+    }
+
+    .action-card-title {
+        font-size: 12px;
+    }
+
+    .playing-card {
+        width: 52px;
+        height: 74px;
+    }
+
+    .player-hand .playing-card {
+        margin-left: -15px;
+    }
+
+    .table-player {
+        width: 78px;
+    }
+}
+
+
+/* =========================================================
+   40. SAFE AREA
+================================================================ */
+
+@supports (
+    padding:
+        env(
+            safe-area-inset-bottom
+        )
+) {
+
+    .bottom-navigation {
+        padding-bottom:
+            calc(
+                8px +
+                env(
+                    safe-area-inset-bottom
+                )
+            );
+    }
+}
+
+
+/* =========================================================
+   41. ACCESSIBILITY
+================================================================ */
+
+button:focus-visible,
+input:focus-visible {
+    outline:
+        2px solid
+        var(--gold);
+
+    outline-offset: 2px;
+}
+
+
+/* =========================================================
+   42. REDUCED MOTION
+================================================================ */
+
+@media (
+    prefers-reduced-motion: reduce
+) {
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+
+        animation-duration:
+            0.01ms !important;
+
+        animation-iteration-count:
+            1 !important;
+
+        transition-duration:
+            0.01ms !important;
+    }
+}
+
+
+/* =========================================================
+   END OF STYLE.CSS
+   ========================================================= */
