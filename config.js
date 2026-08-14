@@ -5,26 +5,213 @@
  * HOKM ONLINE
  * config.js
  *
- * تنظیمات مرکزی پروژه
+ * نسخه اصلاح‌شده و کامل
  *
- * این فایل فقط تنظیمات عمومی بازی را نگهداری می‌کند.
+ * این فایل تنظیمات مرکزی کل پروژه را نگهداری می‌کند.
  *
- * نکته:
- * در این مرحله هیچ اتصال مستقیمی به Supabase نداریم.
- * اتصال واقعی در مراحل بعدی ساخته خواهد شد.
+ * امکانات حفظ‌شده:
+ *
+ * - بازی حکم ۴ نفره
+ * - بازی محلی
+ * - Multiplayer
+ * - اتاق‌ها
+ * - احراز هویت
+ * - پروفایل
+ * - سکه
+ * - سطح
+ * - آمار بازی
+ * - فروشگاه
+ * - موجودی
+ * - چت
+ * - رتبه‌بندی
+ * - اعلان‌ها
+ * - دوستان
+ * - تاریخچه بازی
+ * - صدا
+ * - انیمیشن
+ * - تنظیمات
+ * - امنیت
+ * - Debug
+ * - Supabase
+ *
  * ================================================================
  */
 
 
 /* ================================================================
-   1. APPLICATION CONFIG
+   1. SUPABASE CONFIG
+================================================================ */
+
+/*
+ * اطلاعات پروژه Supabase
+ *
+ * بعداً این دو مقدار را با اطلاعات واقعی پروژه خودت جایگزین می‌کنیم.
+ *
+ * مهم:
+ * anon key برای استفاده در Frontend طراحی شده است.
+ *
+ * service_role key را هرگز داخل این فایل قرار نده.
+ */
+
+const SUPABASE_CONFIG = {
+
+    enabled: true,
+
+    url: "",
+
+    anonKey: "",
+
+    /*
+     * اگر تأیید ایمیل فعال باشد،
+     * کاربر بعد از ثبت‌نام باید ایمیل خود را تأیید کند.
+     */
+
+    emailConfirmationRequired: true,
+
+    /*
+     * مسیر بازگشت بازیابی رمز عبور
+     */
+
+    passwordResetPath: "/",
+
+    /*
+     * نام جدول پروفایل
+     */
+
+    profileTable: "profiles",
+
+    /*
+     * نام فیلد نام نمایشی در Frontend
+     *
+     * auth.js از display_name استفاده می‌کند.
+     */
+
+    profileDisplayNameField: "display_name",
+
+    /*
+     * در database.sql فعلی username وجود دارد.
+     *
+     * این مقدار را نگه می‌داریم تا در مرحله هماهنگ‌سازی
+     * database.js / auth.js بتوانیم هر دو ساختار را پشتیبانی کنیم.
+     */
+
+    profileUsernameField: "username"
+
+};
+
+
+/* ================================================================
+   2. SUPABASE CLIENT INITIALIZATION
+================================================================ */
+
+/*
+ * اگر کتابخانه Supabase در index.html بارگذاری شده باشد،
+ * در صورت وجود URL و anon key کلاینت ساخته می‌شود.
+ *
+ * اگر هنوز اطلاعات Supabase وارد نشده باشد،
+ * بازی از کار نمی‌افتد و حالت Local قابل استفاده باقی می‌ماند.
+ */
+
+function initializeSupabaseClient() {
+
+    if (
+        !SUPABASE_CONFIG.enabled
+    ) {
+
+        console.warn(
+            "Supabase در config غیرفعال است."
+        );
+
+        return null;
+    }
+
+
+    /*
+     * اگر قبلاً Client ساخته شده باشد،
+     * دوباره آن را نساز.
+     */
+
+    if (
+        window.supabaseClient &&
+        typeof window.supabaseClient.from === "function"
+    ) {
+
+        return window.supabaseClient;
+    }
+
+
+    /*
+     * بررسی وجود کتابخانه Supabase
+     */
+
+    if (
+        !window.supabase ||
+        typeof window.supabase.createClient !== "function"
+    ) {
+
+        console.warn(
+            "کتابخانه Supabase JS پیدا نشد."
+        );
+
+        return null;
+    }
+
+
+    /*
+     * بررسی تنظیمات
+     */
+
+    if (
+        !SUPABASE_CONFIG.url ||
+        !SUPABASE_CONFIG.anonKey
+    ) {
+
+        console.warn(
+            "Supabase URL یا Anon Key هنوز وارد نشده است."
+        );
+
+        return null;
+    }
+
+
+    try {
+
+        const client =
+            window.supabase.createClient(
+                SUPABASE_CONFIG.url,
+                SUPABASE_CONFIG.anonKey
+            );
+
+
+        window.supabaseClient =
+            client;
+
+
+        console.log(
+            "Supabase Client initialized successfully."
+        );
+
+
+        return client;
+
+
+    } catch (error) {
+
+        console.error(
+            "خطا در ساخت Supabase Client:",
+            error
+        );
+
+        return null;
+    }
+}
+
+
+/* ================================================================
+   3. APPLICATION CONFIG
 ================================================================ */
 
 const APP_CONFIG = {
-
-    /*
-     * اطلاعات عمومی برنامه
-     */
 
     app: {
 
@@ -38,248 +225,231 @@ const APP_CONFIG = {
 
         direction: "rtl",
 
-        defaultScreen: "homeScreen"
+        defaultScreen: "homeScreen",
+
+        platform: "web",
+
+        mobileFirst: true
     },
 
 
     /* ============================================================
-       2. GAME CONFIG
+       4. GAME CONFIG
     ============================================================ */
 
     game: {
 
-        /*
-         * تعداد بازیکنان حکم
-         */
-
         playersPerGame: 4,
-
-
-        /*
-         * تعداد کارت‌های هر بازیکن
-         */
 
         cardsPerPlayer: 13,
 
-
-        /*
-         * تعداد کل کارت‌ها
-         */
-
         totalCards: 52,
-
-
-        /*
-         * تعداد دست لازم برای بردن راند
-         */
 
         tricksToWinRound: 7,
 
-
-        /*
-         * حداکثر تعداد دست در یک راند
-         */
-
         maxTricksPerRound: 13,
-
-
-        /*
-         * تعداد تیم‌ها
-         */
 
         teams: 2,
 
-
-        /*
-         * تعداد بازیکن در هر تیم
-         */
-
         playersPerTeam: 2,
-
-
-        /*
-         * مدت تأخیر نمایش کارت کامپیوتر
-         * بر حسب میلی‌ثانیه
-         */
 
         computerTurnDelay: 750,
 
-
-        /*
-         * مدت نمایش نتیجه هر دست
-         */
-
         trickResultDelay: 900,
 
+        roundResultDelay: 1200,
 
         /*
-         * مدت نمایش نتیجه راند
+         * تعداد راندهای بازی
          */
 
-        roundResultDelay: 1200
+        maxRounds: 3,
+
+        /*
+         * فعال بودن بازی محلی
+         */
+
+        localModeEnabled: true,
+
+        /*
+         * فعال بودن بازی آنلاین
+         */
+
+        onlineModeEnabled: true,
+
+        /*
+         * امکان بازی با Bot
+         */
+
+        botEnabled: true,
+
+        /*
+         * امکان بازی تک‌نفره با Bot
+         */
+
+        singlePlayerEnabled: true,
+
+        /*
+         * امکان بازی دوستانه
+         */
+
+        friendlyGamesEnabled: true,
+
+        /*
+         * امکان بازی رقابتی
+         */
+
+        rankedGamesEnabled: true
     },
 
 
     /* ============================================================
-       3. ROOM CONFIG
+       5. ROOM CONFIG
     ============================================================ */
 
     room: {
 
-        /*
-         * تعداد ارقام کد اتاق
-         */
-
         codeLength: 6,
-
-
-        /*
-         * حداقل تعداد بازیکن برای شروع
-         */
 
         minPlayersToStart: 4,
 
-
-        /*
-         * حداکثر تعداد بازیکن اتاق
-         */
-
         maxPlayers: 4,
-
-
-        /*
-         * حداکثر طول نام اتاق
-         */
 
         maxRoomNameLength: 30,
 
+        demoRoomExpiration:
+            30 * 60 * 1000,
 
         /*
-         * حداکثر مدت اعتبار اتاق آزمایشی
-         * 30 دقیقه
+         * امکان ساخت اتاق عمومی
          */
 
-        demoRoomExpiration:
-            30 * 60 * 1000
+        publicRoomsEnabled: true,
+
+        /*
+         * امکان ساخت اتاق خصوصی
+         */
+
+        privateRoomsEnabled: true,
+
+        /*
+         * امکان ورود با کد
+         */
+
+        joinByCodeEnabled: true,
+
+        /*
+         * امکان تعیین هزینه ورود
+         */
+
+        entryFeeEnabled: true,
+
+        /*
+         * حداکثر زمان انتظار اتاق
+         */
+
+        waitingTimeout:
+            10 * 60 * 1000
     },
 
 
     /* ============================================================
-       4. PLAYER CONFIG
+       6. PLAYER CONFIG
     ============================================================ */
 
     player: {
 
-        /*
-         * نام پیش‌فرض بازیکن
-         */
-
         defaultName: "بازیکن مهمان",
-
-
-        /*
-         * حداقل طول نام
-         */
 
         minNameLength: 2,
 
-
-        /*
-         * حداکثر طول نام
-         */
-
         maxNameLength: 20,
-
-
-        /*
-         * سکه اولیه
-         */
 
         startingCoins: 1000,
 
-
-        /*
-         * سطح اولیه
-         */
-
         startingLevel: 1,
-
-
-        /*
-         * تعداد بازی اولیه
-
-         */
 
         startingGamesPlayed: 0,
 
+        startingGamesWon: 0,
+
+        startingExperience: 0,
 
         /*
-         * تعداد برد اولیه
+         * امکان بازی مهمان
          */
 
-        startingGamesWon: 0
+        guestEnabled: true,
+
+        /*
+         * امکان تغییر نام
+         */
+
+        changeNameEnabled: true,
+
+        /*
+         * امکان آواتار
+         */
+
+        avatarEnabled: true,
+
+        /*
+         * حداکثر طول Bio
+         */
+
+        maxBioLength: 160
     },
 
 
     /* ============================================================
-       5. ECONOMY CONFIG
+       7. ECONOMY CONFIG
     ============================================================ */
 
     economy: {
 
-        /*
-         * پاداش برد
-         */
-
         winReward: 100,
-
-
-        /*
-         * پاداش باخت
-         */
 
         loseReward: 25,
 
-
-        /*
-         * حداقل سکه قابل نگهداری
-         */
-
         minimumCoins: 0,
-
-
-        /*
-         * حداکثر سکه
-         *
-         * فعلاً بسیار بالا قرار داده شده.
-         * بعداً می‌توانیم سیستم اقتصاد را حرفه‌ای‌تر کنیم.
-         */
 
         maximumCoins: 999999999,
 
+        defaultEntryFee: 0,
 
         /*
-         * هزینه پیش‌فرض ورود به اتاق
+         * فعال بودن سیستم سکه
          */
 
-        defaultEntryFee: 0
+        enabled: true,
+
+        /*
+         * فعال بودن تراکنش‌های سکه
+         */
+
+        transactionHistoryEnabled: true,
+
+        /*
+         * پاداش تجربه برای برد
+         */
+
+        winExperience: 100,
+
+        /*
+         * پاداش تجربه برای باخت
+         */
+
+        loseExperience: 25
     },
 
 
     /* ============================================================
-       6. SHOP CONFIG
+       8. SHOP CONFIG
     ============================================================ */
 
     shop: {
 
         enabled: true,
-
-
-        /*
-         * آیتم‌های فروشگاه نسخه اولیه
-         *
-         * این‌ها فعلاً آیتم‌های تزئینی هستند.
-         */
 
         items: {
 
@@ -334,341 +504,482 @@ const APP_CONFIG = {
 
 
     /* ============================================================
-       7. LOCAL STORAGE
+       9. STORAGE CONFIG
     ============================================================ */
 
     storage: {
 
-        /*
-         * کلید ذخیره اطلاعات بازیکن
-         */
-
         playerKey:
             "hokm_online_player_v1",
-
-
-        /*
-         * کلید تنظیمات
-         */
 
         settingsKey:
             "hokm_online_settings_v1",
 
-
-        /*
-         * کلید اطلاعات موقت بازی
-         */
-
         gameKey:
-            "hokm_online_game_v1"
+            "hokm_online_game_v1",
+
+        roomKey:
+            "hokm_online_room_v1",
+
+        authKey:
+            "hokm_online_auth_v1",
+
+        inventoryKey:
+            "hokm_online_inventory_v1",
+
+        notificationKey:
+            "hokm_online_notifications_v1",
+
+        chatKey:
+            "hokm_online_chat_v1"
     },
 
 
     /* ============================================================
-       8. UI CONFIG
+       10. UI CONFIG
     ============================================================ */
 
     ui: {
 
-        /*
-         * مدت نمایش Toast
-         */
-
         toastDuration: 2500,
-
-
-        /*
-         * مدت انیمیشن صفحه
-         */
 
         screenTransitionDuration: 300,
 
-
-        /*
-         * سرعت انیمیشن کارت
-         */
-
         cardAnimationDuration: 350,
-
-
-        /*
-         * فعال بودن انیمیشن‌ها
-         */
 
         animations: true,
 
+        visualEffects: true,
 
-        /*
-         * فعال بودن افکت‌های بصری
-         */
+        responsive: true,
 
-        visualEffects: true
+        mobileOptimized: true,
+
+        fullscreenGame: true
     },
 
 
     /* ============================================================
-       9. SOUND CONFIG
+       11. SOUND CONFIG
     ============================================================ */
 
     sound: {
 
         enabled: true,
 
-
-        /*
-         * صدای کلیک
-
-         */
-
         click: true,
-
-
-        /*
-         * صدای بازی کارت
-
-         */
 
         cardPlay: true,
 
-
-        /*
-         * صدای برد دست
-
-         */
-
         trickWin: true,
-
-
-        /*
-         * صدای برد بازی
-
-         */
 
         gameWin: true,
 
+        notification: true,
 
-        /*
-         * صدای اعلان
+        music: true,
 
-         */
-
-        notification: true
+        volume: 0.7
     },
 
 
     /* ============================================================
-       10. MULTIPLAYER CONFIG
+       12. MULTIPLAYER CONFIG
     ============================================================ */
 
     multiplayer: {
 
         /*
-         * در این مرحله خاموش است.
+         * Multiplayer واقعی آماده اتصال است.
          *
-         * در مراحل بعدی که Multiplayer واقعی
-         * ساخته شد، این مقدار فعال خواهد شد.
+         * وقتی Supabase تنظیم شود،
+         * حالت online قابل استفاده خواهد بود.
          */
 
-        enabled: false,
+        enabled: true,
 
-
-        /*
-         * حالت فعلی بازی
-         */
-
-        mode: "local",
-
-
-        /*
-         * تعداد بازیکنان آنلاین
-
-         */
+        mode: "online",
 
         maxPlayers: 4,
 
-
-        /*
-         * زمان انتظار برای اتصال بازیکن
-
-         */
-
         connectionTimeout: 15000,
 
+        syncInterval: 1000,
 
-        /*
-         * فاصله بررسی وضعیت بازی
+        reconnectEnabled: true,
 
-         */
+        reconnectAttempts: 5,
 
-        syncInterval: 1000
+        reconnectDelay: 2000,
+
+        realtimeEnabled: true,
+
+        presenceEnabled: true,
+
+        broadcastEnabled: true
     },
 
 
     /* ============================================================
-       11. AUTH CONFIG
+       13. AUTH CONFIG
     ============================================================ */
 
     auth: {
 
         /*
-         * احراز هویت واقعی بعداً اضافه می‌شود.
+         * احراز هویت واقعی فعال است.
          */
 
-        enabled: false,
-
-
-        /*
-         * اجازه ورود مهمان در نسخه فعلی
-         */
+        enabled: true,
 
         guestMode: true,
 
-
-        /*
-         * حداقل طول رمز عبور
-         */
-
         minimumPasswordLength: 6,
 
+        maximumUsernameLength: 20,
 
-        /*
-         * حداکثر طول نام کاربری
-         */
+        emailLoginEnabled: true,
 
-        maximumUsernameLength: 20
+        passwordLoginEnabled: true,
+
+        passwordResetEnabled: true,
+
+        profileEnabled: true,
+
+        autoCreateProfile: true,
+
+        sessionPersistence: true
     },
 
 
     /* ============================================================
-       12. LEADERBOARD CONFIG
+       14. LEADERBOARD CONFIG
     ============================================================ */
 
     leaderboard: {
 
         enabled: true,
 
-
-        /*
-         * تعداد بازیکن قابل نمایش
-         */
-
         visiblePlayers: 10,
 
+        defaultSort: "wins",
 
-        /*
-         * نوع رتبه‌بندی فعلی
-         */
+        globalEnabled: true,
 
-        defaultSort: "wins"
+        weeklyEnabled: true,
+
+        monthlyEnabled: true,
+
+        friendsEnabled: true
     },
 
 
     /* ============================================================
-       13. CHAT CONFIG
+       15. CHAT CONFIG
     ============================================================ */
 
     chat: {
 
         enabled: true,
 
-
-        /*
-         * حداکثر طول پیام
-         */
-
         maxMessageLength: 100,
 
+        maxMessages: 50,
 
-        /*
-         * حداکثر تعداد پیام قابل نمایش محلی
-         */
+        roomChatEnabled: true,
 
-        maxMessages: 50
+        gameChatEnabled: true,
+
+        privateChatEnabled: false,
+
+        emojiEnabled: true
     },
 
 
     /* ============================================================
-       14. SECURITY CONFIG
+       16. FRIEND CONFIG
+    ============================================================ */
+
+    friends: {
+
+        enabled: true,
+
+        requestsEnabled: true,
+
+        blockEnabled: true,
+
+        onlineStatusEnabled: true,
+
+        maximumFriends: 500
+    },
+
+
+    /* ============================================================
+       17. NOTIFICATION CONFIG
+    ============================================================ */
+
+    notifications: {
+
+        enabled: true,
+
+        gameNotifications: true,
+
+        friendNotifications: true,
+
+        systemNotifications: true,
+
+        rewardNotifications: true,
+
+        maximumStored: 100
+    },
+
+
+    /* ============================================================
+       18. HISTORY CONFIG
+    ============================================================ */
+
+    history: {
+
+        enabled: true,
+
+        maximumRecords: 100,
+
+        storeGameResults: true,
+
+        storeTrickResults: true,
+
+        storeCoinTransactions: true
+    },
+
+
+    /* ============================================================
+       19. SECURITY CONFIG
     ============================================================ */
 
     security: {
 
-        /*
-         * محدودیت ساده برای نام‌ها
-         */
-
         sanitizeNames: true,
-
-
-        /*
-         * محدودیت ساده پیام‌ها
-         */
 
         sanitizeMessages: true,
 
+        escapeUserContent: true,
 
-        /*
-         * جلوگیری از HTML در محتوای کاربر
-         */
+        validateRoomCodes: true,
 
-        escapeUserContent: true
+        validateEntryFees: true,
+
+        validateCardMoves: true,
+
+        preventDuplicateMoves: true
     },
 
 
     /* ============================================================
-       15. DEBUG CONFIG
+       20. DEBUG CONFIG
     ============================================================ */
 
     debug: {
 
-        /*
-         * حالت توسعه
-         */
-
         enabled: true,
-
-
-        /*
-         * نمایش لاگ بازی
-         */
 
         gameLogs: true,
 
-
-        /*
-         * نمایش لاگ اتاق
-         */
-
         roomLogs: true,
 
+        authLogs: true,
 
-        /*
-         * نمایش خطاها
-         */
+        realtimeLogs: true,
 
-        errorLogs: true
+        errorLogs: true,
+
+        databaseLogs: true
     }
 
 };
 
 
 /* ================================================================
-   16. HELPER FUNCTIONS
+   21. DATABASE CONFIG
+================================================================ */
+
+const DATABASE_CONFIG = {
+
+    schema: "public",
+
+    tables: {
+
+        profiles: "profiles",
+
+        playerSettings: "player_settings",
+
+        shopItems: "shop_items",
+
+        playerInventory: "player_inventory",
+
+        coinTransactions: "coin_transactions",
+
+        rooms: "rooms",
+
+        roomPlayers: "room_players",
+
+        games: "games",
+
+        gamePlayers: "game_players",
+
+        gameHands: "game_hands",
+
+        gameTricks: "game_tricks",
+
+        trickCards: "trick_cards",
+
+        chatMessages: "chat_messages",
+
+        gameHistory: "game_history",
+
+        notifications: "notifications",
+
+        friendships: "friendships"
+    }
+
+};
+
+
+/* ================================================================
+   22. CARD CONFIG
+================================================================ */
+
+const CARD_CONFIG = {
+
+    suits: [
+
+        "hearts",
+
+        "diamonds",
+
+        "clubs",
+
+        "spades"
+
+    ],
+
+    ranks: [
+
+        2,
+
+        3,
+
+        4,
+
+        5,
+
+        6,
+
+        7,
+
+        8,
+
+        9,
+
+        10,
+
+        11,
+
+        12,
+
+        13,
+
+        14
+
+    ],
+
+    rankNames: {
+
+        11: "J",
+
+        12: "Q",
+
+        13: "K",
+
+        14: "A"
+    },
+
+    totalCards: 52
+};
+
+
+/* ================================================================
+   23. PROFILE CONFIG
+================================================================ */
+
+/*
+ * این بخش برای هماهنگ کردن auth.js
+ * با database.sql در نظر گرفته شده است.
+ */
+
+const PROFILE_CONFIG = {
+
+    table: "profiles",
+
+    idField: "id",
+
+    /*
+     * نامی که Frontend استفاده می‌کند.
+     */
+
+    displayNameField: "display_name",
+
+    /*
+     * نام فعلی موجود در database.sql
+     */
+
+    usernameField: "username",
+
+    avatarField: "avatar_url",
+
+    coinsField: "coins",
+
+    levelField: "level",
+
+    gamesPlayedField: "games_played",
+
+    gamesWonField: "games_won",
+
+    totalTricksField: "total_tricks",
+
+    experienceField: "experience",
+
+    onlineField: "is_online",
+
+    lastSeenField: "last_seen"
+};
+
+
+/* ================================================================
+   24. HELPER FUNCTIONS
 ================================================================ */
 
 
 /*
- * دریافت تنظیمات برنامه
+ * دریافت تنظیمات با مسیر
+ *
+ * مثال:
+ *
+ * getConfig("game.playersPerGame")
  */
 
-function getConfig(path, fallback = null) {
+function getConfig(
+    path,
+    fallback = null
+) {
 
     if (!path) {
+
         return fallback;
     }
 
+
     const parts =
-        path.split(".");
+        String(path).split(".");
 
 
     let current =
@@ -699,9 +1010,9 @@ function getConfig(path, fallback = null) {
 }
 
 
-/*
- * بررسی فعال بودن Multiplayer
- */
+/* ================================================================
+   25. FEATURE CHECKS
+================================================================ */
 
 function isMultiplayerEnabled() {
 
@@ -711,10 +1022,6 @@ function isMultiplayerEnabled() {
 }
 
 
-/*
- * بررسی فعال بودن احراز هویت
- */
-
 function isAuthEnabled() {
 
     return Boolean(
@@ -722,10 +1029,6 @@ function isAuthEnabled() {
     );
 }
 
-
-/*
- * بررسی فعال بودن فروشگاه
- */
 
 function isShopEnabled() {
 
@@ -735,10 +1038,6 @@ function isShopEnabled() {
 }
 
 
-/*
- * بررسی فعال بودن صدا
- */
-
 function isSoundEnabled() {
 
     return Boolean(
@@ -746,10 +1045,6 @@ function isSoundEnabled() {
     );
 }
 
-
-/*
- * بررسی حالت Debug
- */
 
 function isDebugEnabled() {
 
@@ -759,16 +1054,68 @@ function isDebugEnabled() {
 }
 
 
+function isChatEnabled() {
+
+    return Boolean(
+        APP_CONFIG.chat.enabled
+    );
+}
+
+
+function isFriendsEnabled() {
+
+    return Boolean(
+        APP_CONFIG.friends.enabled
+    );
+}
+
+
+function isLeaderboardEnabled() {
+
+    return Boolean(
+        APP_CONFIG.leaderboard.enabled
+    );
+}
+
+
+function isNotificationsEnabled() {
+
+    return Boolean(
+        APP_CONFIG.notifications.enabled
+    );
+}
+
+
 /* ================================================================
-   17. SAFE PLAYER CONFIG
+   26. SUPABASE STATUS
+================================================================ */
+
+function isSupabaseConfigured() {
+
+    return Boolean(
+        SUPABASE_CONFIG.enabled &&
+        SUPABASE_CONFIG.url &&
+        SUPABASE_CONFIG.anonKey
+    );
+}
+
+
+/* ================================================================
+   27. DEFAULT PLAYER DATA
 ================================================================ */
 
 function getDefaultPlayerData() {
 
     return {
 
+        id: null,
+
         name:
             APP_CONFIG.player.defaultName,
+
+        email: null,
+
+        avatarUrl: null,
 
         coins:
             APP_CONFIG.player.startingCoins,
@@ -782,7 +1129,14 @@ function getDefaultPlayerData() {
         gamesWon:
             APP_CONFIG.player.startingGamesWon,
 
+        totalTricks: 0,
+
+        experience:
+            APP_CONFIG.player.startingExperience,
+
         inventory: [],
+
+        isOnline: false,
 
         createdAt:
             Date.now()
@@ -791,12 +1145,13 @@ function getDefaultPlayerData() {
 
 
 /* ================================================================
-   18. ROOM VALIDATION
+   28. ROOM VALIDATION
 ================================================================ */
 
 function isValidRoomCode(code) {
 
     if (!code) {
+
         return false;
     }
 
@@ -814,12 +1169,13 @@ function isValidRoomCode(code) {
 
 
 /* ================================================================
-   19. PLAYER NAME VALIDATION
+   29. PLAYER NAME VALIDATION
 ================================================================ */
 
 function isValidPlayerName(name) {
 
     if (!name) {
+
         return false;
     }
 
@@ -839,7 +1195,7 @@ function isValidPlayerName(name) {
 
 
 /* ================================================================
-   20. ENTRY FEE VALIDATION
+   30. ENTRY FEE VALIDATION
 ================================================================ */
 
 function isValidEntryFee(
@@ -852,16 +1208,19 @@ function isValidEntryFee(
 
 
     if (!Number.isFinite(amount)) {
+
         return false;
     }
 
 
     if (amount < 0) {
+
         return false;
     }
 
 
     if (amount > playerCoins) {
+
         return false;
     }
 
@@ -871,19 +1230,56 @@ function isValidEntryFee(
 
 
 /* ================================================================
-   21. EXPORT-LIKE GLOBAL ACCESS
+   31. CARD VALIDATION
 ================================================================ */
 
+function isValidSuit(suit) {
 
-/*
- * چون پروژه فعلاً بدون bundler و به صورت HTML/CSS/JS
- * اجرا می‌شود، تنظیمات را روی window قرار می‌دهیم
- * تا فایل‌های دیگر بتوانند از آن استفاده کنند.
- */
+    return CARD_CONFIG.suits.includes(
+        suit
+    );
+}
+
+
+function isValidRank(rank) {
+
+    const numericRank =
+        Number(rank);
+
+
+    return CARD_CONFIG.ranks.includes(
+        numericRank
+    );
+}
+
+
+/* ================================================================
+   32. PUBLIC CONFIG
+================================================================ */
 
 window.HOKM_CONFIG =
     APP_CONFIG;
 
+
+window.HOKM_SUPABASE_CONFIG =
+    SUPABASE_CONFIG;
+
+
+window.HOKM_DATABASE_CONFIG =
+    DATABASE_CONFIG;
+
+
+window.HOKM_CARD_CONFIG =
+    CARD_CONFIG;
+
+
+window.HOKM_PROFILE_CONFIG =
+    PROFILE_CONFIG;
+
+
+/* ================================================================
+   33. PUBLIC CONFIG API
+================================================================ */
 
 window.HokmConfig = {
 
@@ -905,6 +1301,21 @@ window.HokmConfig = {
     isDebugEnabled:
         isDebugEnabled,
 
+    isChatEnabled:
+        isChatEnabled,
+
+    isFriendsEnabled:
+        isFriendsEnabled,
+
+    isLeaderboardEnabled:
+        isLeaderboardEnabled,
+
+    isNotificationsEnabled:
+        isNotificationsEnabled,
+
+    isSupabaseConfigured:
+        isSupabaseConfigured,
+
     getDefaultPlayerData:
         getDefaultPlayerData,
 
@@ -915,12 +1326,70 @@ window.HokmConfig = {
         isValidPlayerName,
 
     isValidEntryFee:
-        isValidEntryFee
+        isValidEntryFee,
+
+    isValidSuit:
+        isValidSuit,
+
+    isValidRank:
+        isValidRank,
+
+    getDatabaseTables:
+        function () {
+
+            return DATABASE_CONFIG.tables;
+        },
+
+    getProfileConfig:
+        function () {
+
+            return PROFILE_CONFIG;
+        }
 };
 
 
 /* ================================================================
-   22. INITIALIZATION LOG
+   34. INITIALIZE SUPABASE
+================================================================ */
+
+/*
+ * Supabase را بعد از آماده شدن DOM
+ * یا بلافاصله در صورت آماده بودن اجرا می‌کنیم.
+ */
+
+function startSupabaseInitialization() {
+
+    try {
+
+        initializeSupabaseClient();
+
+    } catch (error) {
+
+        console.error(
+            "خطا در initialize Supabase:",
+            error
+        );
+    }
+}
+
+
+if (
+    document.readyState === "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        startSupabaseInitialization
+    );
+
+} else {
+
+    startSupabaseInitialization();
+}
+
+
+/* ================================================================
+   35. DEBUG LOG
 ================================================================ */
 
 if (
@@ -931,13 +1400,38 @@ if (
         `Hokm Online ${APP_CONFIG.app.version} config loaded.`
     );
 
+
     console.log(
         "Environment:",
         APP_CONFIG.app.environment
     );
 
+
     console.log(
         "Multiplayer:",
         APP_CONFIG.multiplayer.enabled
     );
+
+
+    console.log(
+        "Authentication:",
+        APP_CONFIG.auth.enabled
+    );
+
+
+    console.log(
+        "Supabase configured:",
+        isSupabaseConfigured()
+    );
+
+
+    console.log(
+        "Database tables:",
+        DATABASE_CONFIG.tables
+    );
 }
+
+
+/* ================================================================
+   END OF CONFIG.JS
+================================================================ */
