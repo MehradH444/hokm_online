@@ -5,31 +5,36 @@
  * HOKM ONLINE
  * auth.js
  *
- * مرحله ۵
+ * نسخه هماهنگ‌شده با database.sql
  *
- * مسئولیت‌های این فایل:
+ * امکانات:
+ * - ثبت‌نام
+ * - ورود
+ * - خروج
+ * - Session
+ * - بررسی کاربر فعلی
+ * - پروفایل
+ * - ساخت/تکمیل پروفایل
+ * - username
+ * - display_name برای سازگاری با کدهای قبلی
+ * - avatar
+ * - coins
+ * - level
+ * - games_played
+ * - games_won
+ * - total_tricks
+ * - experience
+ * - وضعیت آنلاین
+ * - آخرین زمان فعالیت
+ * - تغییر نام
+ * - تغییر رمز
+ * - بازیابی رمز
+ * - Auth State Listener
+ * - هماهنگی با game.js
+ * - Event System
  *
- * - ثبت‌نام کاربر
- * - ورود کاربر
- * - خروج کاربر
- * - بررسی نشست کاربر
- * - دریافت کاربر فعلی
- * - دریافت پروفایل
- * - ساخت پروفایل اولیه
- * - به‌روزرسانی پروفایل
- * - تغییر نام نمایشی
- * - تغییر رمز عبور
- * - بازیابی رمز عبور
- * - گوش دادن به تغییرات وضعیت احراز هویت
- *
- * وابستگی:
- *
- * config.js
- *
- * این فایل برای Supabase طراحی شده است.
- *
- * در این مرحله هنوز Multiplayer را وصل نمی‌کنیم.
- * اتصال Multiplayer در مرحله ۶ انجام می‌شود.
+ * مهم:
+ * این فایل هیچ قابلیت قبلی را حذف نمی‌کند.
  * ================================================================
  */
 
@@ -37,20 +42,6 @@
 /* ================================================================
    1. SUPABASE CLIENT
 ================================================================ */
-
-/*
- * config.js باید قبل از auth.js بارگذاری شود.
- *
- * انتظار داریم config.js یکی از این موارد را در اختیار قرار دهد:
- *
- * window.supabaseClient
- *
- * یا
- *
- * window.supabase
- *
- * برای سازگاری بیشتر هر دو حالت پشتیبانی می‌شوند.
- */
 
 function getSupabaseClient() {
 
@@ -60,6 +51,11 @@ function getSupabaseClient() {
     ) {
         return window.supabaseClient;
     }
+
+    /*
+     * بعضی نسخه‌های پروژه ممکن است Client را
+     * مستقیماً داخل window.supabase قرار داده باشند.
+     */
 
     if (
         window.supabase &&
@@ -105,6 +101,7 @@ const authEvents = {
 
     listeners: {},
 
+
     on(eventName, callback) {
 
         if (
@@ -123,6 +120,22 @@ const authEvents = {
             callback
         );
     },
+
+
+    off(eventName, callback) {
+
+        if (
+            !this.listeners[eventName]
+        ) {
+            return;
+        }
+
+        this.listeners[eventName] =
+            this.listeners[eventName].filter(
+                listener => listener !== callback
+            );
+    },
+
 
     emit(eventName, data) {
 
@@ -163,8 +176,7 @@ function authToast(
 ) {
 
     if (
-        typeof window.showToast ===
-        "function"
+        typeof window.showToast === "function"
     ) {
 
         window.showToast(
@@ -189,8 +201,7 @@ function authLoading(
 
     if (
         show &&
-        typeof window.showLoading ===
-        "function"
+        typeof window.showLoading === "function"
     ) {
 
         window.showLoading(
@@ -202,8 +213,7 @@ function authLoading(
 
     if (
         !show &&
-        typeof window.hideLoading ===
-        "function"
+        typeof window.hideLoading === "function"
     ) {
 
         window.hideLoading();
@@ -212,7 +222,7 @@ function authLoading(
 
 
 /* ================================================================
-   5. GET CURRENT USER
+   5. CURRENT USER
 ================================================================ */
 
 function getCurrentUser() {
@@ -222,7 +232,7 @@ function getCurrentUser() {
 
 
 /* ================================================================
-   6. GET CURRENT SESSION
+   6. CURRENT SESSION
 ================================================================ */
 
 function getCurrentSession() {
@@ -245,7 +255,7 @@ function isLoggedIn() {
 
 
 /* ================================================================
-   8. GET PROFILE
+   8. CURRENT PROFILE
 ================================================================ */
 
 function getCurrentProfile() {
@@ -255,7 +265,36 @@ function getCurrentProfile() {
 
 
 /* ================================================================
-   9. LOAD SESSION
+   9. DISPLAY NAME
+================================================================ */
+
+/*
+ * دیتابیس از username استفاده می‌کند.
+ *
+ * برای سازگاری با فایل‌های قبلی پروژه:
+ *
+ * display_name
+ *
+ * همچنان در JavaScript پشتیبانی می‌شود.
+ */
+
+function getDisplayName(
+    profile = authState.profile,
+    user = authState.user
+) {
+
+    return (
+        profile?.username ||
+        profile?.display_name ||
+        user?.user_metadata?.display_name ||
+        user?.user_metadata?.username ||
+        "بازیکن"
+    );
+}
+
+
+/* ================================================================
+   10. LOAD SESSION
 ================================================================ */
 
 async function loadAuthSession() {
@@ -308,7 +347,7 @@ async function loadAuthSession() {
 
 
 /* ================================================================
-   10. LOAD PROFILE
+   11. LOAD PROFILE
 ================================================================ */
 
 async function loadProfile(
@@ -334,6 +373,7 @@ async function loadProfile(
         return null;
     }
 
+
     try {
 
         const {
@@ -345,6 +385,7 @@ async function loadProfile(
             .eq("id", id)
             .maybeSingle();
 
+
         if (error) {
 
             console.error(
@@ -355,10 +396,13 @@ async function loadProfile(
             return null;
         }
 
+
         authState.profile =
             data || null;
 
+
         return data || null;
+
 
     } catch (error) {
 
@@ -373,8 +417,24 @@ async function loadProfile(
 
 
 /* ================================================================
-   11. CREATE PROFILE
+   12. CREATE / ENSURE PROFILE
 ================================================================ */
+
+/*
+ * در database.sql یک Trigger وجود دارد:
+ *
+ * handle_new_user()
+ *
+ * که هنگام ثبت‌نام، پروفایل را خودکار می‌سازد.
+ *
+ * بنابراین این تابع ابتدا پروفایل را می‌خواند.
+ *
+ * اگر Trigger ساخته باشد:
+ * همان پروفایل استفاده می‌شود.
+ *
+ * اگر به هر دلیل وجود نداشته باشد:
+ * تلاش می‌کنیم آن را ایجاد کنیم.
+ */
 
 async function createProfile(
     user,
@@ -384,32 +444,41 @@ async function createProfile(
     const client =
         getSupabaseClient();
 
-    if (!client || !user) {
+    if (
+        !client ||
+        !user
+    ) {
         return null;
     }
 
-    const defaultName =
-        extraData.display_name ||
-        user.user_metadata?.display_name ||
-        user.user_metadata?.name ||
-        "بازیکن مهمان";
+
+    const metadata =
+        user.user_metadata || {};
+
+
+    const username =
+        String(
+            extraData.username ||
+            extraData.display_name ||
+            metadata.username ||
+            metadata.display_name ||
+            "بازیکن"
+        )
+            .trim()
+            .slice(0, 20);
+
 
     const profileData = {
 
         id:
             user.id,
 
-        email:
-            user.email || null,
-
-        display_name:
-            String(defaultName)
-                .trim()
-                .slice(0, 20),
+        username:
+            username || "بازیکن",
 
         avatar_url:
             extraData.avatar_url ||
-            user.user_metadata?.avatar_url ||
+            metadata.avatar_url ||
             null,
 
         coins:
@@ -434,8 +503,25 @@ async function createProfile(
             Number(
                 extraData.games_won ??
                 0
-            )
+            ),
 
+        total_tricks:
+            Number(
+                extraData.total_tricks ??
+                0
+            ),
+
+        experience:
+            Number(
+                extraData.experience ??
+                0
+            ),
+
+        is_online:
+            true,
+
+        last_seen:
+            new Date().toISOString()
     };
 
 
@@ -450,11 +536,14 @@ async function createProfile(
             .select()
             .single();
 
+
         if (error) {
 
             /*
-             * اگر پروفایل قبلاً وجود داشته باشد،
-             * به جای خراب شدن سیستم آن را دوباره می‌خوانیم.
+             * اگر Trigger قبلاً پروفایل را ساخته باشد،
+             * خطای duplicate می‌گیریم.
+             *
+             * در این حالت فقط پروفایل را دوباره می‌خوانیم.
              */
 
             if (
@@ -466,6 +555,7 @@ async function createProfile(
                 );
             }
 
+
             console.error(
                 "خطا در ساخت پروفایل:",
                 error
@@ -474,10 +564,13 @@ async function createProfile(
             return null;
         }
 
+
         authState.profile =
             data;
 
+
         return data;
+
 
     } catch (error) {
 
@@ -492,7 +585,7 @@ async function createProfile(
 
 
 /* ================================================================
-   12. ENSURE PROFILE
+   13. ENSURE PROFILE
 ================================================================ */
 
 async function ensureProfile(
@@ -503,10 +596,21 @@ async function ensureProfile(
         return null;
     }
 
+
+    /*
+     * اول تلاش برای دریافت پروفایل
+     */
+
     let profile =
         await loadProfile(
             user.id
         );
+
+
+    /*
+     * اگر وجود نداشت،
+     * تلاش برای ساخت آن
+     */
 
     if (!profile) {
 
@@ -516,12 +620,119 @@ async function ensureProfile(
             );
     }
 
+
+    /*
+     * اگر پروفایل وجود داشت،
+     * وضعیت آنلاین را به‌روزرسانی می‌کنیم.
+     */
+
+    if (profile) {
+
+        await updateOnlineStatus(
+            true,
+            false
+        );
+    }
+
+
     return profile;
 }
 
 
 /* ================================================================
-   13. SIGN UP
+   14. UPDATE ONLINE STATUS
+================================================================ */
+
+async function updateOnlineStatus(
+    online = true,
+    showMessage = false
+) {
+
+    const client =
+        getSupabaseClient();
+
+    if (
+        !client ||
+        !authState.user
+    ) {
+        return false;
+    }
+
+
+    try {
+
+        const {
+            data,
+            error
+        } = await client
+            .from("profiles")
+            .update({
+
+                is_online:
+                    Boolean(online),
+
+                last_seen:
+                    new Date().toISOString()
+
+            })
+            .eq(
+                "id",
+                authState.user.id
+            )
+            .select()
+            .maybeSingle();
+
+
+        if (error) {
+
+            console.warn(
+                "خطا در به‌روزرسانی وضعیت آنلاین:",
+                error
+            );
+
+            return false;
+        }
+
+
+        if (data) {
+
+            authState.profile =
+                data;
+        }
+
+
+        if (
+            showMessage
+        ) {
+
+            authToast(
+                online
+                    ? "آنلاین شدی."
+                    : "وضعیت آفلاین شد.",
+                online
+                    ? "🟢"
+                    : "⚪"
+            );
+        }
+
+
+        return true;
+
+
+    } catch (error) {
+
+        console.error(
+            "خطای updateOnlineStatus:",
+            error
+        );
+
+        return false;
+    }
+}
+
+
+/* ================================================================
+   15. SIGN UP
 ================================================================ */
 
 async function signUp(
@@ -533,6 +744,7 @@ async function signUp(
     const client =
         getSupabaseClient();
 
+
     if (!client) {
 
         authToast(
@@ -541,8 +753,12 @@ async function signUp(
         );
 
         return {
+
             success: false,
-            error: "Supabase client not found"
+
+            error:
+                "Supabase client not found"
+
         };
     }
 
@@ -552,8 +768,10 @@ async function signUp(
             .trim()
             .toLowerCase();
 
+
     password =
         String(password || "");
+
 
     displayName =
         String(displayName || "")
@@ -568,8 +786,12 @@ async function signUp(
         );
 
         return {
+
             success: false,
-            error: "EMAIL_REQUIRED"
+
+            error:
+                "EMAIL_REQUIRED"
+
         };
     }
 
@@ -582,8 +804,12 @@ async function signUp(
         );
 
         return {
+
             success: false,
-            error: "INVALID_EMAIL"
+
+            error:
+                "INVALID_EMAIL"
+
         };
     }
 
@@ -598,8 +824,12 @@ async function signUp(
         );
 
         return {
+
             success: false,
-            error: "WEAK_PASSWORD"
+
+            error:
+                "WEAK_PASSWORD"
+
         };
     }
 
@@ -614,8 +844,12 @@ async function signUp(
         );
 
         return {
+
             success: false,
-            error: "INVALID_NAME"
+
+            error:
+                "INVALID_NAME"
+
         };
     }
 
@@ -627,6 +861,11 @@ async function signUp(
             "در حال ساخت حساب..."
         );
 
+
+        /*
+         * username را داخل metadata می‌فرستیم
+         * تا Trigger دیتابیس بتواند آن را دریافت کند.
+         */
 
         const {
             data,
@@ -640,6 +879,10 @@ async function signUp(
             options: {
 
                 data: {
+
+                    username:
+                        displayName
+                            .slice(0, 20),
 
                     display_name:
                         displayName
@@ -673,8 +916,11 @@ async function signUp(
             );
 
             return {
+
                 success: false,
+
                 error
+
             };
         }
 
@@ -682,16 +928,18 @@ async function signUp(
         authState.user =
             data?.user || null;
 
+
         authState.session =
             data?.session || null;
+
 
         authState.loggedIn =
             !!authState.user;
 
 
         /*
-         * اگر Supabase تأیید ایمیل نخواهد،
-         * Session بلافاصله ساخته می‌شود.
+         * اگر Session فوراً ساخته شده باشد،
+         * پروفایل را می‌گیریم.
          */
 
         if (
@@ -702,7 +950,6 @@ async function signUp(
             await ensureProfile(
                 data.user
             );
-
         }
 
 
@@ -729,7 +976,6 @@ async function signUp(
                 "🎉",
                 3500
             );
-
         }
 
 
@@ -737,6 +983,9 @@ async function signUp(
             "signup",
             data
         );
+
+
+        updateAuthUI();
 
 
         return {
@@ -747,7 +996,10 @@ async function signUp(
                 data?.user || null,
 
             session:
-                data?.session || null
+                data?.session || null,
+
+            profile:
+                authState.profile
 
         };
 
@@ -769,15 +1021,18 @@ async function signUp(
         );
 
         return {
+
             success: false,
+
             error
+
         };
     }
 }
 
 
 /* ================================================================
-   14. SIGN IN
+   16. SIGN IN
 ================================================================ */
 
 async function signIn(
@@ -788,6 +1043,7 @@ async function signIn(
     const client =
         getSupabaseClient();
 
+
     if (!client) {
 
         authToast(
@@ -796,7 +1052,12 @@ async function signIn(
         );
 
         return {
-            success: false
+
+            success: false,
+
+            error:
+                "Supabase client not found"
+
         };
     }
 
@@ -805,6 +1066,7 @@ async function signIn(
         String(email || "")
             .trim()
             .toLowerCase();
+
 
     password =
         String(password || "");
@@ -818,8 +1080,12 @@ async function signIn(
         );
 
         return {
+
             success: false,
-            error: "EMAIL_REQUIRED"
+
+            error:
+                "EMAIL_REQUIRED"
+
         };
     }
 
@@ -832,8 +1098,12 @@ async function signIn(
         );
 
         return {
+
             success: false,
-            error: "INVALID_EMAIL"
+
+            error:
+                "INVALID_EMAIL"
+
         };
     }
 
@@ -846,8 +1116,12 @@ async function signIn(
         );
 
         return {
+
             success: false,
-            error: "PASSWORD_REQUIRED"
+
+            error:
+                "PASSWORD_REQUIRED"
+
         };
     }
 
@@ -893,8 +1167,11 @@ async function signIn(
             );
 
             return {
+
                 success: false,
+
                 error
+
             };
         }
 
@@ -902,8 +1179,10 @@ async function signIn(
         authState.user =
             data?.user || null;
 
+
         authState.session =
             data?.session || null;
+
 
         authState.loggedIn =
             !!authState.user;
@@ -923,6 +1202,9 @@ async function signIn(
             "signin",
             data
         );
+
+
+        updateAuthUI();
 
 
         authToast(
@@ -965,15 +1247,18 @@ async function signIn(
         );
 
         return {
+
             success: false,
+
             error
+
         };
     }
 }
 
 
 /* ================================================================
-   15. SIGN OUT
+   17. SIGN OUT
 ================================================================ */
 
 async function signOut() {
@@ -981,12 +1266,23 @@ async function signOut() {
     const client =
         getSupabaseClient();
 
+
     if (!client) {
         return false;
     }
 
 
     try {
+
+        /*
+         * قبل از خروج وضعیت آنلاین را خاموش می‌کنیم.
+         */
+
+        await updateOnlineStatus(
+            false,
+            false
+        );
+
 
         authLoading(
             true,
@@ -1039,6 +1335,9 @@ async function signOut() {
         );
 
 
+        updateAuthUI();
+
+
         authToast(
             "با موفقیت از حساب خارج شدی.",
             "🚪"
@@ -1065,7 +1364,7 @@ async function signOut() {
 
 
 /* ================================================================
-   16. UPDATE PROFILE
+   18. UPDATE PROFILE
 ================================================================ */
 
 async function updateProfile(
@@ -1074,6 +1373,7 @@ async function updateProfile(
 
     const client =
         getSupabaseClient();
+
 
     if (
         !client ||
@@ -1092,21 +1392,24 @@ async function updateProfile(
     const allowedUpdates = {};
 
 
+    /*
+     * username
+     */
+
     if (
-        updates.display_name !==
-        undefined
+        updates.username !== undefined
     ) {
 
-        const name =
+        const username =
             String(
-                updates.display_name
+                updates.username
             )
                 .trim()
                 .slice(0, 20);
 
 
         if (
-            name.length < 2
+            username.length < 2
         ) {
 
             authToast(
@@ -1118,19 +1421,79 @@ async function updateProfile(
         }
 
 
-        allowedUpdates.display_name =
-            name;
+        allowedUpdates.username =
+            username;
     }
 
 
+    /*
+     * display_name
+     *
+     * برای سازگاری با فایل‌های قبلی.
+     *
+     * در دیتابیس به username تبدیل می‌شود.
+     */
+
     if (
-        updates.avatar_url !==
-        undefined
+        updates.display_name !== undefined
+    ) {
+
+        const displayName =
+            String(
+                updates.display_name
+            )
+                .trim()
+                .slice(0, 20);
+
+
+        if (
+            displayName.length < 2
+        ) {
+
+            authToast(
+                "نام بازیکن معتبر نیست.",
+                "⚠️"
+            );
+
+            return null;
+        }
+
+
+        /*
+         * اگر username قبلاً مشخص نشده،
+         * display_name را به username تبدیل می‌کنیم.
+         */
+
+        if (
+            allowedUpdates.username === undefined
+        ) {
+
+            allowedUpdates.username =
+                displayName;
+        }
+    }
+
+
+    /*
+     * avatar
+     */
+
+    if (
+        updates.avatar_url !== undefined
     ) {
 
         allowedUpdates.avatar_url =
             updates.avatar_url;
     }
+
+
+    /*
+     * فقط فیلدهایی که واقعاً مجاز هستند
+     * به دیتابیس ارسال می‌شوند.
+     *
+     * coins و level و آمار بازی از این تابع
+     * قابل تغییر مستقیم نیستند تا امنیت حفظ شود.
+     */
 
 
     if (
@@ -1181,69 +1544,10 @@ async function updateProfile(
             data;
 
 
-        /*
-         * اگر game.js از state.player استفاده کند،
-         * در صورت وجود آن را هم هماهنگ می‌کنیم.
-         */
-
-        if (
-            window.state &&
-            window.state.player
-        ) {
-
-            if (
-                data.display_name
-            ) {
-
-                window.state.player.name =
-                    data.display_name;
-            }
-
-            if (
-                data.coins !==
-                undefined
-            ) {
-
-                window.state.player.coins =
-                    data.coins;
-            }
-
-            if (
-                data.level !==
-                undefined
-            ) {
-
-                window.state.player.level =
-                    data.level;
-            }
-
-            if (
-                data.games_played !==
-                undefined
-            ) {
-
-                window.state.player.gamesPlayed =
-                    data.games_played;
-            }
-
-            if (
-                data.games_won !==
-                undefined
-            ) {
-
-                window.state.player.gamesWon =
-                    data.games_won;
-            }
+        syncWithGameState();
 
 
-            if (
-                typeof window.updatePlayerUI ===
-                "function"
-            ) {
-
-                window.updatePlayerUI();
-            }
-        }
+        updateAuthUI();
 
 
         authEvents.emit(
@@ -1268,7 +1572,7 @@ async function updateProfile(
 
 
 /* ================================================================
-   17. UPDATE DISPLAY NAME
+   19. UPDATE DISPLAY NAME
 ================================================================ */
 
 async function updateDisplayName(
@@ -1285,7 +1589,23 @@ async function updateDisplayName(
 
 
 /* ================================================================
-   18. CHANGE PASSWORD
+   20. UPDATE USERNAME
+================================================================ */
+
+async function updateUsername(
+    username
+) {
+
+    return await updateProfile({
+
+        username
+
+    });
+}
+
+
+/* ================================================================
+   21. CHANGE PASSWORD
 ================================================================ */
 
 async function changePassword(
@@ -1294,6 +1614,7 @@ async function changePassword(
 
     const client =
         getSupabaseClient();
+
 
     if (!client) {
         return false;
@@ -1397,7 +1718,7 @@ async function changePassword(
 
 
 /* ================================================================
-   19. RESET PASSWORD
+   22. RESET PASSWORD
 ================================================================ */
 
 async function resetPassword(
@@ -1406,6 +1727,7 @@ async function resetPassword(
 
     const client =
         getSupabaseClient();
+
 
     if (!client) {
         return false;
@@ -1448,8 +1770,10 @@ async function resetPassword(
             email,
 
             {
+
                 redirectTo:
                     redirectUrl
+
             }
 
         );
@@ -1505,7 +1829,7 @@ async function resetPassword(
 
 
 /* ================================================================
-   20. EMAIL VALIDATION
+   23. EMAIL VALIDATION
 ================================================================ */
 
 function isValidEmail(
@@ -1515,6 +1839,7 @@ function isValidEmail(
     const pattern =
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+
     return pattern.test(
         String(email || "")
     );
@@ -1522,7 +1847,7 @@ function isValidEmail(
 
 
 /* ================================================================
-   21. AUTH ERROR TRANSLATION
+   24. AUTH ERROR TRANSLATION
 ================================================================ */
 
 function translateAuthError(
@@ -1606,6 +1931,29 @@ function translateAuthError(
     }
 
 
+    if (
+        message.includes(
+            "already registered"
+        )
+    ) {
+
+        return "این حساب قبلاً ثبت شده است.";
+    }
+
+
+    if (
+        message.includes(
+            "email address"
+        ) &&
+        message.includes(
+            "invalid"
+        )
+    ) {
+
+        return "ایمیل واردشده معتبر نیست.";
+    }
+
+
     return (
         error?.message ||
         "خطایی در احراز هویت رخ داد."
@@ -1614,7 +1962,7 @@ function translateAuthError(
 
 
 /* ================================================================
-   22. AUTH STATE LISTENER
+   25. AUTH STATE LISTENER
 ================================================================ */
 
 function setupAuthListener() {
@@ -1622,12 +1970,14 @@ function setupAuthListener() {
     const client =
         getSupabaseClient();
 
+
     if (!client) {
         return;
     }
 
 
     client.auth.onAuthStateChange(
+
         async (
             event,
             session
@@ -1651,14 +2001,17 @@ function setupAuthListener() {
                 !!authState.user;
 
 
+            /*
+             * SIGNED_IN
+             */
+
             if (
                 authState.user
             ) {
 
                 /*
-                 * برای جلوگیری از مشکلات
-                 * callbackهای داخلی Supabase،
-                 * دریافت پروفایل را کمی بعد انجام می‌دهیم.
+                 * برای جلوگیری از مشکلات callback داخلی
+                 * Supabase، عملیات دیتابیس را کمی بعد انجام می‌دهیم.
                  */
 
                 setTimeout(
@@ -1669,6 +2022,11 @@ function setupAuthListener() {
                         );
 
                         updateAuthUI();
+
+                        authEvents.emit(
+                            "profileReady",
+                            authState.profile
+                        );
 
                     },
                     0
@@ -1698,12 +2056,13 @@ function setupAuthListener() {
             );
 
         }
+
     );
 }
 
 
 /* ================================================================
-   23. AUTH UI
+   26. UPDATE AUTH UI
 ================================================================ */
 
 function updateAuthUI() {
@@ -1713,18 +2072,12 @@ function updateAuthUI() {
 
 
     /*
-     * عناصر عمومی
+     * عناصر مخصوص کاربران واردشده
      */
 
     const loggedInElements =
         document.querySelectorAll(
             "[data-auth='logged-in']"
-        );
-
-
-    const loggedOutElements =
-        document.querySelectorAll(
-            "[data-auth='logged-out']"
         );
 
 
@@ -1738,6 +2091,16 @@ function updateAuthUI() {
 
         }
     );
+
+
+    /*
+     * عناصر مخصوص کاربران خارج‌شده
+     */
+
+    const loggedOutElements =
+        document.querySelectorAll(
+            "[data-auth='logged-out']"
+        );
 
 
     loggedOutElements.forEach(
@@ -1763,9 +2126,7 @@ function updateAuthUI() {
 
 
     const name =
-        authState.profile?.display_name ||
-        authState.user?.user_metadata?.display_name ||
-        "بازیکن";
+        getDisplayName();
 
 
     userNameElements.forEach(
@@ -1817,18 +2178,13 @@ function updateAuthUI() {
                 authState.user?.user_metadata?.avatar_url;
 
 
-            if (avatar) {
+            if (
+                avatar &&
+                element.tagName === "IMG"
+            ) {
 
-                if (
-                    element.tagName ===
-                    "IMG"
-                ) {
-
-                    element.src =
-                        avatar;
-
-                }
-
+                element.src =
+                    avatar;
             }
 
         }
@@ -1836,8 +2192,117 @@ function updateAuthUI() {
 
 
     /*
-     * اگر game.js وجود داشته باشد،
-     * اطلاعات بازیکن را هماهنگ می‌کنیم.
+     * سکه
+     */
+
+    const coinElements =
+        document.querySelectorAll(
+            "[data-user-coins]"
+        );
+
+
+    coinElements.forEach(
+        element => {
+
+            element.textContent =
+                Number(
+                    authState.profile?.coins ?? 0
+                ).toLocaleString("fa-IR");
+
+        }
+    );
+
+
+    /*
+     * سطح
+     */
+
+    const levelElements =
+        document.querySelectorAll(
+            "[data-user-level]"
+        );
+
+
+    levelElements.forEach(
+        element => {
+
+            element.textContent =
+                Number(
+                    authState.profile?.level ?? 1
+                ).toLocaleString("fa-IR");
+
+        }
+    );
+
+
+    /*
+     * تعداد بازی
+     */
+
+    const gamesPlayedElements =
+        document.querySelectorAll(
+            "[data-games-played]"
+        );
+
+
+    gamesPlayedElements.forEach(
+        element => {
+
+            element.textContent =
+                Number(
+                    authState.profile?.games_played ?? 0
+                ).toLocaleString("fa-IR");
+
+        }
+    );
+
+
+    /*
+     * تعداد برد
+     */
+
+    const gamesWonElements =
+        document.querySelectorAll(
+            "[data-games-won]"
+        );
+
+
+    gamesWonElements.forEach(
+        element => {
+
+            element.textContent =
+                Number(
+                    authState.profile?.games_won ?? 0
+                ).toLocaleString("fa-IR");
+
+        }
+    );
+
+
+    /*
+     * تجربه
+     */
+
+    const experienceElements =
+        document.querySelectorAll(
+            "[data-user-experience]"
+        );
+
+
+    experienceElements.forEach(
+        element => {
+
+            element.textContent =
+                Number(
+                    authState.profile?.experience ?? 0
+                ).toLocaleString("fa-IR");
+
+        }
+    );
+
+
+    /*
+     * هماهنگی با game.js
      */
 
     syncWithGameState();
@@ -1845,7 +2310,7 @@ function updateAuthUI() {
 
 
 /* ================================================================
-   24. SYNC WITH GAME.JS
+   27. SYNC WITH GAME.JS
 ================================================================ */
 
 function syncWithGameState() {
@@ -1869,18 +2334,32 @@ function syncWithGameState() {
         authState.profile;
 
 
+    /*
+     * Name
+     */
+
+    const playerName =
+        getDisplayName(
+            profile,
+            authState.user
+        );
+
+
     if (
-        profile.display_name
+        playerName
     ) {
 
         window.state.player.name =
-            profile.display_name;
+            playerName;
     }
 
 
+    /*
+     * Coins
+     */
+
     if (
-        profile.coins !==
-        undefined
+        profile.coins !== undefined
     ) {
 
         window.state.player.coins =
@@ -1890,9 +2369,12 @@ function syncWithGameState() {
     }
 
 
+    /*
+     * Level
+     */
+
     if (
-        profile.level !==
-        undefined
+        profile.level !== undefined
     ) {
 
         window.state.player.level =
@@ -1902,9 +2384,12 @@ function syncWithGameState() {
     }
 
 
+    /*
+     * Games played
+     */
+
     if (
-        profile.games_played !==
-        undefined
+        profile.games_played !== undefined
     ) {
 
         window.state.player.gamesPlayed =
@@ -1914,9 +2399,12 @@ function syncWithGameState() {
     }
 
 
+    /*
+     * Games won
+     */
+
     if (
-        profile.games_won !==
-        undefined
+        profile.games_won !== undefined
     ) {
 
         window.state.player.gamesWon =
@@ -1925,6 +2413,54 @@ function syncWithGameState() {
             );
     }
 
+
+    /*
+     * Total tricks
+     */
+
+    if (
+        profile.total_tricks !== undefined
+    ) {
+
+        window.state.player.totalTricks =
+            Number(
+                profile.total_tricks
+            );
+    }
+
+
+    /*
+     * Experience
+     */
+
+    if (
+        profile.experience !== undefined
+    ) {
+
+        window.state.player.experience =
+            Number(
+                profile.experience
+            );
+    }
+
+
+    /*
+     * Avatar
+
+     */
+
+    if (
+        profile.avatar_url !== undefined
+    ) {
+
+        window.state.player.avatar =
+            profile.avatar_url;
+    }
+
+
+    /*
+     * UI Update
+     */
 
     if (
         typeof window.updatePlayerUI ===
@@ -1937,7 +2473,41 @@ function syncWithGameState() {
 
 
 /* ================================================================
-   25. INITIALIZE AUTH
+   28. REFRESH PROFILE
+================================================================ */
+
+async function refreshProfile() {
+
+    if (
+        !authState.user
+    ) {
+        return null;
+    }
+
+
+    const profile =
+        await loadProfile(
+            authState.user.id
+        );
+
+
+    if (profile) {
+
+        updateAuthUI();
+
+        authEvents.emit(
+            "profileUpdated",
+            profile
+        );
+    }
+
+
+    return profile;
+}
+
+
+/* ================================================================
+   29. INITIALIZE AUTH
 ================================================================ */
 
 async function initializeAuth() {
@@ -1946,7 +2516,7 @@ async function initializeAuth() {
         authState.initialized
     ) {
 
-        return;
+        return authState;
     }
 
 
@@ -1960,7 +2530,7 @@ async function initializeAuth() {
             "Auth initialization متوقف شد چون Supabase Client پیدا نشد."
         );
 
-        return;
+        return authState;
     }
 
 
@@ -1970,8 +2540,17 @@ async function initializeAuth() {
             true;
 
 
+        /*
+         * Session فعلی را دریافت می‌کنیم.
+         */
+
         await loadAuthSession();
 
+
+        /*
+         * اگر کاربر وارد شده باشد،
+         * پروفایلش را می‌گیریم.
+         */
 
         if (
             authState.user
@@ -1983,8 +2562,16 @@ async function initializeAuth() {
         }
 
 
+        /*
+         * Listener
+         */
+
         setupAuthListener();
 
+
+        /*
+         * UI
+         */
 
         updateAuthUI();
 
@@ -2019,21 +2606,28 @@ async function initializeAuth() {
         );
 
 
+        return authState;
+
+
     } catch (error) {
 
         authState.loading =
             false;
 
+
         console.error(
             "خطا در initializeAuth:",
             error
         );
+
+
+        return authState;
     }
 }
 
 
 /* ================================================================
-   26. WAIT FOR AUTH
+   30. WAIT FOR AUTH
 ================================================================ */
 
 function waitForAuth() {
@@ -2070,7 +2664,7 @@ function waitForAuth() {
 
 
 /* ================================================================
-   27. AUTH EVENT HELPERS
+   31. AUTH EVENT HELPERS
 ================================================================ */
 
 function onAuthChange(
@@ -2117,17 +2711,37 @@ function onProfileUpdated(
 }
 
 
+function onProfileReady(
+    callback
+) {
+
+    authEvents.on(
+        "profileReady",
+        callback
+    );
+}
+
+
+function onSignUp(
+    callback
+) {
+
+    authEvents.on(
+        "signup",
+        callback
+    );
+}
+
+
 /* ================================================================
-   28. PUBLIC API
+   32. PUBLIC API
 ================================================================ */
 
-/*
- * همه توابع مهم را روی window قرار می‌دهیم
- * تا game.js، index.html و فایل‌های بعدی بتوانند
- * به آنها دسترسی داشته باشند.
- */
-
 window.hokmAuth = {
+
+    /*
+     * Authentication
+     */
 
     signUp,
 
@@ -2139,9 +2753,16 @@ window.hokmAuth = {
 
     changePassword,
 
+
+    /*
+     * Profile
+     */
+
     updateProfile,
 
     updateDisplayName,
+
+    updateUsername,
 
     getCurrentUser,
 
@@ -2149,13 +2770,36 @@ window.hokmAuth = {
 
     getCurrentProfile,
 
-    isLoggedIn,
+    getDisplayName,
 
     loadProfile,
 
+    refreshProfile,
+
     ensureProfile,
 
+
+    /*
+     * Status
+     */
+
+    updateOnlineStatus,
+
+    isLoggedIn,
+
+
+    /*
+     * Initialization
+     */
+
     waitForAuth,
+
+    initializeAuth,
+
+
+    /*
+     * Events
+     */
 
     onAuthChange,
 
@@ -2163,45 +2807,146 @@ window.hokmAuth = {
 
     onSignOut,
 
+    onSignUp,
+
     onProfileUpdated,
 
-    initializeAuth
+    onProfileReady
 
 };
 
 
 /* ================================================================
-   29. GLOBAL SHORTCUTS
+   33. GLOBAL SHORTCUTS
 ================================================================ */
-
-/*
- * این‌ها برای راحتی فایل‌های بعدی هستند.
- */
 
 window.signUp =
     signUp;
 
+
 window.signIn =
     signIn;
+
 
 window.signOut =
     signOut;
 
+
 window.resetPassword =
     resetPassword;
+
+
+window.changePassword =
+    changePassword;
+
+
+window.updateProfile =
+    updateProfile;
+
+
+window.updateDisplayName =
+    updateDisplayName;
+
+
+window.updateUsername =
+    updateUsername;
+
 
 window.getCurrentUser =
     getCurrentUser;
 
+
 window.getCurrentProfile =
     getCurrentProfile;
+
+
+window.getCurrentSession =
+    getCurrentSession;
+
+
+window.getDisplayName =
+    getDisplayName;
+
 
 window.isLoggedIn =
     isLoggedIn;
 
 
 /* ================================================================
-   30. START
+   34. PAGE VISIBILITY
+================================================================ */
+
+/*
+ * وقتی کاربر از صفحه خارج می‌شود،
+ * last_seen به‌روزرسانی می‌شود.
+ *
+ * این بخش فقط برای هماهنگی وضعیت کاربر است
+ * و هیچ قابلیت بازی را حذف نمی‌کند.
+ */
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+
+        if (
+            !authState.user
+        ) {
+            return;
+        }
+
+
+        if (
+            document.visibilityState ===
+            "visible"
+        ) {
+
+            updateOnlineStatus(
+                true,
+                false
+            );
+
+        } else {
+
+            updateOnlineStatus(
+                false,
+                false
+            );
+        }
+
+    }
+);
+
+
+/* ================================================================
+   35. BEFORE UNLOAD
+================================================================ */
+
+window.addEventListener(
+    "beforeunload",
+    () => {
+
+        /*
+         * این درخواست ممکن است همیشه قبل از بسته‌شدن
+         * صفحه کامل نشود؛ بنابراین فقط به‌عنوان
+         * تلاش برای ثبت آخرین وضعیت استفاده می‌شود.
+         */
+
+        if (
+            authState.user
+        ) {
+
+            updateOnlineStatus(
+                false,
+                false
+            );
+        }
+
+    }
+);
+
+
+/* ================================================================
+   36. START
 ================================================================ */
 
 if (
