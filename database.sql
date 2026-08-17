@@ -2,46 +2,48 @@
 -- HOKM ONLINE
 -- database.sql
 --
--- COMPLETE PRODUCTION-READY DATABASE SCHEMA
--- Version: 2.0.0
+-- FINAL FOUNDATION VERSION
 --
 -- PostgreSQL / Supabase
 --
--- این نسخه تمام قابلیت‌های نسخه قبلی را حفظ می‌کند و
--- زیرساخت کامل‌تری برای یک بازی واقعی آنلاین حکم فراهم می‌کند.
+-- امکانات:
 --
--- شامل:
---
--- 1. Player Profiles
--- 2. Player Settings
--- 3. Player Statistics
--- 4. XP / Level
--- 5. Coins
--- 6. Coin Transactions
--- 7. Shop
--- 8. Inventory
--- 9. Rooms
--- 10. Room Players
--- 11. Games
--- 12. Game Players
--- 13. Game Hands
--- 14. Game Tricks
--- 15. Trick Cards
--- 16. Chat
--- 17. Game History
--- 18. Notifications
--- 19. Friendships
--- 20. Achievements
--- 21. Player Achievements
--- 22. Daily Rewards
--- 23. Reports
+-- 1. کاربران و پروفایل
+-- 2. 3000 سکه اولیه
+-- 3. سیستم سکه و تراکنش امن
+-- 4. هزینه ورود بازی 400 سکه
+-- 5. بسته‌های خرید سکه
+-- 6. فروشگاه
+-- 7. آیتم‌های کارت
+-- 8. پوسته کارت
+-- 9. آواتار
+-- 10. میز بازی
+-- 11. ایموت و امکانات تزئینی
+-- 12. اتاق 4 نفره
+-- 13. بازی آنلاین
+-- 14. تیم‌ها
+-- 15. دست کارت
+-- 16. تریک‌ها
+-- 17. حرکات
+-- 18. چت
+-- 19. تاریخچه
+-- 20. دوستان
+-- 21. اعلان‌ها
+-- 22. رتبه‌بندی
+-- 23. تنظیمات
 -- 24. Realtime
--- 25. Security / RLS
--- 26. Automatic Profile Creation
--- 27. Automatic Settings Creation
--- 28. Updated At Triggers
+-- 25. RLS
+-- 26. RPCهای امن برای سکه
 --
--- هیچ قابلیت قبلی حذف نشده است.
+-- قوانین اقتصادی:
+--
+-- شروع بازیکن: 3000 سکه
+-- هزینه هر بازی: 400 سکه
+--
+-- بسته 1: 200 سکه = 25000 تومان
+-- بسته 2: 600 سکه = 40000 تومان
+-- بسته 3: 1200 سکه = 80000 تومان
+--
 -- ================================================================
 
 
@@ -53,27 +55,23 @@ create extension if not exists "pgcrypto";
 
 
 -- ================================================================
--- 2. PLAYER PROFILES
+-- 2. PROFILES
 -- ================================================================
 
 create table if not exists public.profiles (
 
-    id uuid primary key references auth.users(id)
+    id uuid primary key
+        references auth.users(id)
         on delete cascade,
 
-    username text,
-
-    display_name text,
+    username text not null,
 
     avatar_url text,
 
     level integer not null default 1
         check (level >= 1),
 
-    experience bigint not null default 0
-        check (experience >= 0),
-
-    coins bigint not null default 1000
+    coins bigint not null default 3000
         check (coins >= 0),
 
     games_played integer not null default 0
@@ -82,101 +80,34 @@ create table if not exists public.profiles (
     games_won integer not null default 0
         check (games_won >= 0),
 
-    games_lost integer not null default 0
-        check (games_lost >= 0),
-
     total_tricks integer not null default 0
         check (total_tricks >= 0),
 
-    tricks_won integer not null default 0
-        check (tricks_won >= 0),
-
-    win_streak integer not null default 0
-        check (win_streak >= 0),
-
-    best_win_streak integer not null default 0
-        check (best_win_streak >= 0),
+    experience bigint not null default 0
+        check (experience >= 0),
 
     is_online boolean not null default false,
 
-    last_seen timestamptz default now(),
+    last_seen timestamptz
+        default now(),
 
-    created_at timestamptz not null default now(),
+    created_at timestamptz
+        not null default now(),
 
-    updated_at timestamptz not null default now(),
+    updated_at timestamptz
+        not null default now(),
 
-    constraint profiles_games_won_valid
-        check (games_won <= games_played),
-
-    constraint profiles_games_lost_valid
-        check (games_lost <= games_played),
-
-    constraint profiles_display_name_length
+    constraint username_length
         check (
-            display_name is null
-            or char_length(display_name) between 2 and 20
+            char_length(username)
+            between 2 and 20
         ),
 
-    constraint profiles_username_length
+    constraint games_won_valid
         check (
-            username is null
-            or char_length(username) between 2 and 30
+            games_won <= games_played
         )
 );
-
-
--- سازگاری با نسخه‌های قبلی
-
-alter table public.profiles
-add column if not exists username text;
-
-alter table public.profiles
-add column if not exists display_name text;
-
-alter table public.profiles
-add column if not exists avatar_url text;
-
-alter table public.profiles
-add column if not exists level integer not null default 1;
-
-alter table public.profiles
-add column if not exists experience bigint not null default 0;
-
-alter table public.profiles
-add column if not exists coins bigint not null default 1000;
-
-alter table public.profiles
-add column if not exists games_played integer not null default 0;
-
-alter table public.profiles
-add column if not exists games_won integer not null default 0;
-
-alter table public.profiles
-add column if not exists games_lost integer not null default 0;
-
-alter table public.profiles
-add column if not exists total_tricks integer not null default 0;
-
-alter table public.profiles
-add column if not exists tricks_won integer not null default 0;
-
-alter table public.profiles
-add column if not exists win_streak integer not null default 0;
-
-alter table public.profiles
-add column if not exists best_win_streak integer not null default 0;
-
-alter table public.profiles
-add column if not exists is_online boolean not null default false;
-
-alter table public.profiles
-add column if not exists last_seen timestamptz default now();
-
-alter table public.profiles
-add column if not exists created_at timestamptz not null default now();
-
-alter table public.profiles
-add column if not exists updated_at timestamptz not null default now();
 
 
 -- ================================================================
@@ -199,54 +130,18 @@ create table if not exists public.player_settings (
 
     language text not null default 'fa',
 
-    theme text not null default 'classic',
+    theme text not null default 'dark',
 
-    card_theme text not null default 'classic',
+    auto_ready boolean not null default false,
 
-    table_theme text not null default 'classic',
-
-    updated_at timestamptz not null default now()
-);
-
-
--- ================================================================
--- 4. PLAYER STATISTICS
--- ================================================================
-
-create table if not exists public.player_statistics (
-
-    user_id uuid primary key
-        references public.profiles(id)
-        on delete cascade,
-
-    total_games integer not null default 0,
-
-    wins integer not null default 0,
-
-    losses integer not null default 0,
-
-    total_tricks integer not null default 0,
-
-    tricks_won integer not null default 0,
-
-    total_points bigint not null default 0,
-
-    highest_score integer not null default 0,
-
-    current_win_streak integer not null default 0,
-
-    best_win_streak integer not null default 0,
-
-    total_coins_earned bigint not null default 0,
-
-    total_coins_spent bigint not null default 0,
+    show_online_status boolean not null default true,
 
     updated_at timestamptz not null default now()
 );
 
 
 -- ================================================================
--- 5. SHOP ITEMS
+-- 4. SHOP ITEMS
 -- ================================================================
 
 create table if not exists public.shop_items (
@@ -267,7 +162,7 @@ create table if not exists public.shop_items (
 
     image_url text,
 
-    metadata jsonb not null default '{}'::jsonb,
+    rarity text not null default 'common',
 
     is_active boolean not null default true,
 
@@ -275,12 +170,34 @@ create table if not exists public.shop_items (
 
     created_at timestamptz not null default now(),
 
-    updated_at timestamptz not null default now()
+    constraint shop_item_type_valid
+        check (
+            item_type in (
+                'card-theme',
+                'card-back',
+                'avatar',
+                'table-theme',
+                'emote',
+                'frame',
+                'effect',
+                'other'
+            )
+        ),
+
+    constraint shop_item_rarity_valid
+        check (
+            rarity in (
+                'common',
+                'rare',
+                'epic',
+                'legendary'
+            )
+        )
 );
 
 
 -- ================================================================
--- 6. PLAYER INVENTORY
+-- 5. PLAYER INVENTORY
 -- ================================================================
 
 create table if not exists public.player_inventory (
@@ -296,21 +213,16 @@ create table if not exists public.player_inventory (
         references public.shop_items(id)
         on delete cascade,
 
-    quantity integer not null default 1
-        check (quantity >= 1),
-
-    is_equipped boolean not null default false,
-
     purchased_at timestamptz not null default now(),
 
-    updated_at timestamptz not null default now(),
+    is_equipped boolean not null default false,
 
     unique(user_id, item_id)
 );
 
 
 -- ================================================================
--- 7. COIN TRANSACTIONS
+-- 6. COIN TRANSACTIONS
 -- ================================================================
 
 create table if not exists public.coin_transactions (
@@ -324,6 +236,9 @@ create table if not exists public.coin_transactions (
 
     amount bigint not null,
 
+    balance_before bigint not null
+        check (balance_before >= 0),
+
     balance_after bigint not null
         check (balance_after >= 0),
 
@@ -333,14 +248,102 @@ create table if not exists public.coin_transactions (
 
     reference_id uuid,
 
-    metadata jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now(),
+
+    constraint coin_transaction_type_valid
+        check (
+            transaction_type in (
+                'initial_bonus',
+                'game_entry',
+                'game_reward',
+                'shop_purchase',
+                'coin_purchase',
+                'admin_adjustment',
+                'refund',
+                'bonus',
+                'other'
+            )
+        )
+);
+
+
+-- ================================================================
+-- 7. COIN PACKAGES
+-- ================================================================
+
+create table if not exists public.coin_packages (
+
+    id uuid primary key
+        default gen_random_uuid(),
+
+    package_key text not null unique,
+
+    name text not null,
+
+    coins bigint not null
+        check (coins > 0),
+
+    price_toman bigint not null
+        check (price_toman > 0),
+
+    bonus_coins bigint not null default 0
+        check (bonus_coins >= 0),
+
+    is_active boolean not null default true,
+
+    sort_order integer not null default 0,
 
     created_at timestamptz not null default now()
 );
 
 
 -- ================================================================
--- 8. ROOMS
+-- 8. COIN PURCHASES
+-- ================================================================
+
+create table if not exists public.coin_purchases (
+
+    id uuid primary key
+        default gen_random_uuid(),
+
+    user_id uuid not null
+        references public.profiles(id)
+        on delete cascade,
+
+    package_id uuid not null
+        references public.coin_packages(id),
+
+    amount_paid_toman bigint not null
+        check (amount_paid_toman > 0),
+
+    coins_received bigint not null
+        check (coins_received > 0),
+
+    payment_provider text,
+
+    payment_reference text,
+
+    status text not null default 'pending',
+
+    created_at timestamptz not null default now(),
+
+    completed_at timestamptz,
+
+    constraint coin_purchase_status_valid
+        check (
+            status in (
+                'pending',
+                'paid',
+                'failed',
+                'cancelled',
+                'refunded'
+            )
+        )
+);
+
+
+-- ================================================================
+-- 9. GAME ROOMS
 -- ================================================================
 
 create table if not exists public.rooms (
@@ -356,7 +359,7 @@ create table if not exists public.rooms (
         references public.profiles(id)
         on delete cascade,
 
-    entry_fee bigint not null default 0
+    entry_fee bigint not null default 400
         check (entry_fee >= 0),
 
     is_private boolean not null default true,
@@ -366,13 +369,6 @@ create table if not exists public.rooms (
     max_players integer not null default 4
         check (max_players = 4),
 
-    current_players integer not null default 0
-        check (current_players between 0 and 4),
-
-    password_hash text,
-
-    settings jsonb not null default '{}'::jsonb,
-
     created_at timestamptz not null default now(),
 
     updated_at timestamptz not null default now(),
@@ -380,7 +376,9 @@ create table if not exists public.rooms (
     closed_at timestamptz,
 
     constraint room_code_format
-        check (code ~ '^[0-9]{6}$'),
+        check (
+            code ~ '^[0-9]{6}$'
+        ),
 
     constraint room_status_valid
         check (
@@ -396,7 +394,7 @@ create table if not exists public.rooms (
 
 
 -- ================================================================
--- 9. ROOM PLAYERS
+-- 10. ROOM PLAYERS
 -- ================================================================
 
 create table if not exists public.room_players (
@@ -415,14 +413,9 @@ create table if not exists public.room_players (
     seat integer not null
         check (seat between 0 and 3),
 
-    team text not null
-        check (team in ('A', 'B')),
+    team text not null,
 
     is_ready boolean not null default false,
-
-    is_connected boolean not null default true,
-
-    last_ping timestamptz default now(),
 
     joined_at timestamptz not null default now(),
 
@@ -430,12 +423,17 @@ create table if not exists public.room_players (
 
     unique(room_id, user_id),
 
-    unique(room_id, seat)
+    unique(room_id, seat),
+
+    constraint room_player_team
+        check (
+            team in ('A', 'B')
+        )
 );
 
 
 -- ================================================================
--- 10. GAMES
+-- 11. GAMES
 -- ================================================================
 
 create table if not exists public.games (
@@ -457,7 +455,7 @@ create table if not exists public.games (
 
     current_turn integer,
 
-    leader_seat integer default 0,
+    leader_seat integer not null default 0,
 
     trick_number integer not null default 0,
 
@@ -473,17 +471,13 @@ create table if not exists public.games (
 
     winner_team text,
 
-    dealer_seat integer,
+    entry_fee bigint not null default 400,
 
-    hakem_seat integer,
-
-    turn_started_at timestamptz,
+    prize_pool bigint not null default 0,
 
     started_at timestamptz,
 
     finished_at timestamptz,
-
-    game_state jsonb not null default '{}'::jsonb,
 
     created_at timestamptz not null default now(),
 
@@ -504,7 +498,6 @@ create table if not exists public.games (
             phase in (
                 'idle',
                 'dealing',
-                'hakem-selection',
                 'trump-selection',
                 'playing',
                 'trick-finished',
@@ -555,7 +548,7 @@ create table if not exists public.games (
 
 
 -- ================================================================
--- 11. GAME PLAYERS
+-- 12. GAME PLAYERS
 -- ================================================================
 
 create table if not exists public.game_players (
@@ -574,12 +567,9 @@ create table if not exists public.game_players (
     seat integer not null
         check (seat between 0 and 3),
 
-    team text not null
-        check (team in ('A', 'B')),
+    team text not null,
 
     is_host boolean not null default false,
-
-    is_connected boolean not null default true,
 
     final_tricks integer not null default 0,
 
@@ -587,16 +577,19 @@ create table if not exists public.game_players (
 
     joined_at timestamptz not null default now(),
 
-    left_at timestamptz,
-
     unique(game_id, user_id),
 
-    unique(game_id, seat)
+    unique(game_id, seat),
+
+    constraint game_player_team
+        check (
+            team in ('A', 'B')
+        )
 );
 
 
 -- ================================================================
--- 12. GAME HANDS
+-- 13. GAME HANDS
 -- ================================================================
 
 create table if not exists public.game_hands (
@@ -644,7 +637,7 @@ create table if not exists public.game_hands (
 
 
 -- ================================================================
--- 13. GAME TRICKS
+-- 14. GAME TRICKS
 -- ================================================================
 
 create table if not exists public.game_tricks (
@@ -675,7 +668,7 @@ create table if not exists public.game_tricks (
 
 
 -- ================================================================
--- 14. TRICK CARDS
+-- 15. TRICK CARDS
 -- ================================================================
 
 create table if not exists public.trick_cards (
@@ -726,32 +719,7 @@ create table if not exists public.trick_cards (
 
 
 -- ================================================================
--- 15. GAME EVENTS
--- ================================================================
-
-create table if not exists public.game_events (
-
-    id uuid primary key
-        default gen_random_uuid(),
-
-    game_id uuid not null
-        references public.games(id)
-        on delete cascade,
-
-    user_id uuid
-        references public.profiles(id)
-        on delete set null,
-
-    event_type text not null,
-
-    event_data jsonb not null default '{}'::jsonb,
-
-    created_at timestamptz not null default now()
-);
-
-
--- ================================================================
--- 16. CHAT MESSAGES
+-- 16. CHAT
 -- ================================================================
 
 create table if not exists public.chat_messages (
@@ -773,13 +741,12 @@ create table if not exists public.chat_messages (
 
     message text not null,
 
-    message_type text not null default 'text',
-
     created_at timestamptz not null default now(),
 
     constraint chat_message_length
         check (
-            char_length(message) between 1 and 100
+            char_length(message)
+            between 1 and 100
         )
 );
 
@@ -813,12 +780,12 @@ create table if not exists public.game_history (
 
     player_score integer not null default 0,
 
-    xp_earned integer not null default 0,
-
     played_at timestamptz not null default now(),
 
     constraint history_team_valid
-        check (team in ('A', 'B')),
+        check (
+            team in ('A', 'B')
+        ),
 
     constraint history_result_valid
         check (
@@ -849,8 +816,6 @@ create table if not exists public.notifications (
     message text not null,
 
     notification_type text not null default 'system',
-
-    reference_id uuid,
 
     is_read boolean not null default false,
 
@@ -901,160 +866,38 @@ create table if not exists public.friendships (
 
 
 -- ================================================================
--- 20. ACHIEVEMENTS
+-- 20. LEADERBOARD SNAPSHOTS
 -- ================================================================
 
-create table if not exists public.achievements (
+create table if not exists public.leaderboard_scores (
 
-    id uuid primary key
-        default gen_random_uuid(),
+    user_id uuid primary key
+        references public.profiles(id)
+        on delete cascade,
 
-    achievement_key text not null unique,
+    rating integer not null default 1000,
 
-    title text not null,
+    wins integer not null default 0,
 
-    description text not null,
+    losses integer not null default 0,
 
-    icon_url text,
+    total_games integer not null default 0,
 
-    reward_coins bigint not null default 0,
+    win_rate numeric(5,2) not null default 0,
 
-    reward_xp integer not null default 0,
-
-    requirement_type text not null,
-
-    requirement_value bigint not null default 1,
-
-    is_active boolean not null default true,
-
-    created_at timestamptz not null default now()
+    updated_at timestamptz not null default now()
 );
 
 
 -- ================================================================
--- 21. PLAYER ACHIEVEMENTS
--- ================================================================
-
-create table if not exists public.player_achievements (
-
-    id uuid primary key
-        default gen_random_uuid(),
-
-    user_id uuid not null
-        references public.profiles(id)
-        on delete cascade,
-
-    achievement_id uuid not null
-        references public.achievements(id)
-        on delete cascade,
-
-    progress bigint not null default 0,
-
-    completed boolean not null default false,
-
-    completed_at timestamptz,
-
-    unique(user_id, achievement_id)
-);
-
-
--- ================================================================
--- 22. DAILY REWARDS
--- ================================================================
-
-create table if not exists public.daily_rewards (
-
-    id uuid primary key
-        default gen_random_uuid(),
-
-    user_id uuid not null
-        references public.profiles(id)
-        on delete cascade,
-
-    reward_date date not null,
-
-    reward_day integer not null default 1,
-
-    coins bigint not null default 0,
-
-    xp integer not null default 0,
-
-    claimed_at timestamptz not null default now(),
-
-    unique(user_id, reward_date)
-);
-
-
--- ================================================================
--- 23. PLAYER REPORTS
--- ================================================================
-
-create table if not exists public.player_reports (
-
-    id uuid primary key
-        default gen_random_uuid(),
-
-    reporter_id uuid not null
-        references public.profiles(id)
-        on delete cascade,
-
-    reported_user_id uuid not null
-        references public.profiles(id)
-        on delete cascade,
-
-    room_id uuid
-        references public.rooms(id)
-        on delete set null,
-
-    game_id uuid
-        references public.games(id)
-        on delete set null,
-
-    reason text not null,
-
-    description text,
-
-    status text not null default 'pending',
-
-    created_at timestamptz not null default now(),
-
-    reviewed_at timestamptz,
-
-    constraint report_status_valid
-        check (
-            status in (
-                'pending',
-                'reviewed',
-                'resolved',
-                'rejected'
-            )
-        ),
-
-    constraint report_not_self
-        check (
-            reporter_id <> reported_user_id
-        )
-);
-
-
--- ================================================================
--- 24. INDEXES
+-- 21. INDEXES
 -- ================================================================
 
 create index if not exists idx_profiles_username
 on public.profiles(username);
 
-create index if not exists idx_profiles_display_name
-on public.profiles(display_name);
-
 create index if not exists idx_profiles_online
 on public.profiles(is_online);
-
-create index if not exists idx_profiles_level
-on public.profiles(level);
-
-create index if not exists idx_profiles_coins
-on public.profiles(coins);
 
 create index if not exists idx_rooms_code
 on public.rooms(code);
@@ -1077,9 +920,6 @@ on public.games(room_id);
 create index if not exists idx_games_status
 on public.games(status);
 
-create index if not exists idx_games_turn
-on public.games(current_turn);
-
 create index if not exists idx_game_players_game
 on public.game_players(game_id);
 
@@ -1097,12 +937,6 @@ on public.game_tricks(game_id);
 
 create index if not exists idx_trick_cards_trick
 on public.trick_cards(trick_id);
-
-create index if not exists idx_game_events_game
-on public.game_events(game_id);
-
-create index if not exists idx_game_events_created
-on public.game_events(created_at);
 
 create index if not exists idx_chat_room
 on public.chat_messages(room_id);
@@ -1125,40 +959,26 @@ on public.notifications(user_id);
 create index if not exists idx_notifications_unread
 on public.notifications(user_id, is_read);
 
-create index if not exists idx_friendships_requester
-on public.friendships(requester_id);
-
-create index if not exists idx_friendships_addressee
-on public.friendships(addressee_id);
-
 create index if not exists idx_inventory_user
 on public.player_inventory(user_id);
 
 create index if not exists idx_coin_transactions_user
 on public.coin_transactions(user_id);
 
-create index if not exists idx_achievements_active
-on public.achievements(is_active);
+create index if not exists idx_coin_transactions_created
+on public.coin_transactions(created_at);
 
-create index if not exists idx_player_achievements_user
-on public.player_achievements(user_id);
-
-create index if not exists idx_daily_rewards_user
-on public.daily_rewards(user_id);
-
-create index if not exists idx_reports_status
-on public.player_reports(status);
+create index if not exists idx_coin_purchases_user
+on public.coin_purchases(user_id);
 
 
 -- ================================================================
--- 25. UPDATED_AT FUNCTION
+-- 22. UPDATED_AT FUNCTION
 -- ================================================================
 
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
-security invoker
-set search_path = public
 as $$
 begin
 
@@ -1171,7 +991,7 @@ $$;
 
 
 -- ================================================================
--- 26. UPDATED_AT TRIGGERS
+-- 23. UPDATED_AT TRIGGERS
 -- ================================================================
 
 drop trigger if exists profiles_updated_at
@@ -1188,33 +1008,6 @@ on public.player_settings;
 
 create trigger player_settings_updated_at
 before update on public.player_settings
-for each row
-execute function public.set_updated_at();
-
-
-drop trigger if exists player_statistics_updated_at
-on public.player_statistics;
-
-create trigger player_statistics_updated_at
-before update on public.player_statistics
-for each row
-execute function public.set_updated_at();
-
-
-drop trigger if exists shop_items_updated_at
-on public.shop_items;
-
-create trigger shop_items_updated_at
-before update on public.shop_items
-for each row
-execute function public.set_updated_at();
-
-
-drop trigger if exists player_inventory_updated_at
-on public.player_inventory;
-
-create trigger player_inventory_updated_at
-before update on public.player_inventory
 for each row
 execute function public.set_updated_at();
 
@@ -1247,7 +1040,7 @@ execute function public.set_updated_at();
 
 
 -- ================================================================
--- 27. AUTO CREATE PROFILE
+-- 24. AUTO CREATE PROFILE
 -- ================================================================
 
 create or replace function public.handle_new_user()
@@ -1257,49 +1050,80 @@ security definer
 set search_path = public
 as $$
 declare
-    new_name text;
+    new_username text;
 begin
 
-    new_name :=
+    new_username :=
         coalesce(
-            new.raw_user_meta_data ->> 'display_name',
             new.raw_user_meta_data ->> 'username',
+            new.raw_user_meta_data ->> 'display_name',
             'بازیکن'
         );
+
+    new_username :=
+        left(
+            trim(new_username),
+            20
+        );
+
+    if char_length(new_username) < 2 then
+        new_username := 'بازیکن';
+    end if;
 
     insert into public.profiles (
         id,
         username,
-        display_name,
-        avatar_url,
         coins,
         level,
-        experience,
         games_played,
         games_won,
-        games_lost
+        total_tricks,
+        experience
     )
-
     values (
         new.id,
-        left(new_name, 30),
-        left(new_name, 20),
-        new.raw_user_meta_data ->> 'avatar_url',
-        1000,
+        new_username,
+        3000,
         1,
         0,
         0,
         0,
         0
     )
+    on conflict (id) do nothing;
 
-    on conflict (id)
-    do update set
-        display_name =
-            coalesce(
-                public.profiles.display_name,
-                excluded.display_name
-            );
+    insert into public.player_settings (
+        user_id
+    )
+    values (
+        new.id
+    )
+    on conflict (user_id) do nothing;
+
+    insert into public.leaderboard_scores (
+        user_id
+    )
+    values (
+        new.id
+    )
+    on conflict (user_id) do nothing;
+
+    insert into public.coin_transactions (
+        user_id,
+        amount,
+        balance_before,
+        balance_after,
+        transaction_type,
+        description
+    )
+    values (
+        new.id,
+        3000,
+        0,
+        3000,
+        'initial_bonus',
+        'پاداش شروع بازی'
+    );
 
     return new;
 
@@ -1317,58 +1141,7 @@ execute function public.handle_new_user();
 
 
 -- ================================================================
--- 28. AUTO CREATE SETTINGS + STATISTICS
--- ================================================================
-
-create or replace function public.handle_new_profile()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-
-    insert into public.player_settings (
-        user_id
-    )
-
-    values (
-        new.id
-    )
-
-    on conflict (user_id)
-    do nothing;
-
-
-    insert into public.player_statistics (
-        user_id
-    )
-
-    values (
-        new.id
-    )
-
-    on conflict (user_id)
-    do nothing;
-
-
-    return new;
-
-end;
-$$;
-
-
-drop trigger if exists on_profile_created
-on public.profiles;
-
-create trigger on_profile_created
-after insert on public.profiles
-for each row
-execute function public.handle_new_profile();
-
-
--- ================================================================
--- 29. DEFAULT SHOP ITEMS
+-- 25. DEFAULT SHOP ITEMS
 -- ================================================================
 
 insert into public.shop_items (
@@ -1377,198 +1150,722 @@ insert into public.shop_items (
     description,
     item_type,
     price,
+    rarity,
     sort_order
 )
-
 values
 
 (
     'card-classic',
-    'پوسته کلاسیک کارت',
-    'پوسته کلاسیک برای کارت‌های بازی',
+    'کارت کلاسیک',
+    'پوسته کلاسیک و تمیز برای کارت‌های بازی',
     'card-theme',
     250,
+    'common',
     1
 ),
 
 (
     'card-royal',
-    'پوسته سلطنتی کارت',
-    'پوسته ویژه سلطنتی برای کارت‌های بازی',
+    'کارت سلطنتی',
+    'پوسته لوکس سلطنتی برای کارت‌ها',
     'card-theme',
     500,
+    'rare',
     2
+),
+
+(
+    'card-diamond',
+    'کارت الماسی',
+    'پوسته ویژه با طراحی الماسی',
+    'card-theme',
+    900,
+    'epic',
+    3
+),
+
+(
+    'card-gold',
+    'کارت طلایی',
+    'پوسته طلایی ویژه',
+    'card-theme',
+    1500,
+    'legendary',
+    4
+),
+
+(
+    'card-back-blue',
+    'پشت کارت آبی',
+    'پشت کارت حرفه‌ای آبی',
+    'card-back',
+    300,
+    'common',
+    5
+),
+
+(
+    'card-back-royal',
+    'پشت کارت سلطنتی',
+    'پشت کارت ویژه سلطنتی',
+    'card-back',
+    700,
+    'rare',
+    6
 ),
 
 (
     'avatar-gold',
     'آواتار طلایی',
-    'آواتار ویژه طلایی',
+    'قاب آواتار طلایی',
     'avatar',
     750,
-    3
+    'rare',
+    7
+),
+
+(
+    'avatar-royal',
+    'آواتار سلطنتی',
+    'آواتار ویژه بازیکنان حرفه‌ای',
+    'avatar',
+    1200,
+    'epic',
+    8
+),
+
+(
+    'table-green',
+    'میز سبز کلاسیک',
+    'تم استاندارد میز بازی حکم',
+    'table-theme',
+    0,
+    'common',
+    9
 ),
 
 (
     'table-luxury',
     'میز سلطنتی',
-    'تم ویژه برای میز بازی',
+    'میز لوکس برای بازی‌های حرفه‌ای',
     'table-theme',
     1000,
-    4
-)
-
-on conflict (item_key)
-do update set
-    name = excluded.name,
-    description = excluded.description,
-    item_type = excluded.item_type,
-    price = excluded.price;
-
-
--- ================================================================
--- 30. DEFAULT ACHIEVEMENTS
--- ================================================================
-
-insert into public.achievements (
-    achievement_key,
-    title,
-    description,
-    reward_coins,
-    reward_xp,
-    requirement_type,
-    requirement_value
-)
-
-values
-
-(
-    'first-game',
-    'اولین بازی',
-    'اولین بازی خود را انجام بده',
-    100,
-    50,
-    'games_played',
-    1
-),
-
-(
-    'first-win',
-    'اولین پیروزی',
-    'اولین بازی خود را ببر',
-    250,
-    100,
-    'games_won',
-    1
-),
-
-(
-    'ten-wins',
-    'بازیکن حرفه‌ای',
-    '۱۰ بازی را ببر',
-    1000,
-    500,
-    'games_won',
+    'rare',
     10
 ),
 
 (
-    'hundred-wins',
-    'سلطان حکم',
-    '۱۰۰ بازی را ببر',
-    5000,
-    2500,
-    'games_won',
-    100
+    'emote-fire',
+    'ایموت آتش',
+    'ایموت ویژه برای چت',
+    'emote',
+    200,
+    'common',
+    11
 ),
 
 (
-    'hundred-games',
-    'بازیکن باسابقه',
-    '۱۰۰ بازی انجام بده',
-    2500,
-    1500,
-    'games_played',
-    100
+    'emote-crown',
+    'ایموت تاج',
+    'ایموت سلطنتی',
+    'emote',
+    500,
+    'rare',
+    12
+),
+
+(
+    'frame-gold',
+    'قاب طلایی',
+    'قاب ویژه پروفایل',
+    'frame',
+    800,
+    'epic',
+    13
 )
 
-on conflict (achievement_key)
+on conflict (item_key)
 do nothing;
 
 
 -- ================================================================
--- 31. ROW LEVEL SECURITY
+-- 26. DEFAULT COIN PACKAGES
 -- ================================================================
 
-alter table public.profiles
-enable row level security;
+insert into public.coin_packages (
+    package_key,
+    name,
+    coins,
+    price_toman,
+    bonus_coins,
+    sort_order
+)
+values
 
-alter table public.player_settings
-enable row level security;
+(
+    'coins-200',
+    'بسته ۲۰۰ سکه',
+    200,
+    25000,
+    0,
+    1
+),
 
-alter table public.player_statistics
-enable row level security;
+(
+    'coins-600',
+    'بسته ۶۰۰ سکه',
+    600,
+    40000,
+    0,
+    2
+),
 
-alter table public.shop_items
-enable row level security;
+(
+    'coins-1200',
+    'بسته ۱۲۰۰ سکه',
+    1200,
+    80000,
+    0,
+    3
+)
 
-alter table public.player_inventory
-enable row level security;
-
-alter table public.coin_transactions
-enable row level security;
-
-alter table public.rooms
-enable row level security;
-
-alter table public.room_players
-enable row level security;
-
-alter table public.games
-enable row level security;
-
-alter table public.game_players
-enable row level security;
-
-alter table public.game_hands
-enable row level security;
-
-alter table public.game_tricks
-enable row level security;
-
-alter table public.trick_cards
-enable row level security;
-
-alter table public.game_events
-enable row level security;
-
-alter table public.chat_messages
-enable row level security;
-
-alter table public.game_history
-enable row level security;
-
-alter table public.notifications
-enable row level security;
-
-alter table public.friendships
-enable row level security;
-
-alter table public.achievements
-enable row level security;
-
-alter table public.player_achievements
-enable row level security;
-
-alter table public.daily_rewards
-enable row level security;
-
-alter table public.player_reports
-enable row level security;
+on conflict (package_key)
+do nothing;
 
 
 -- ================================================================
--- 32. PROFILES POLICIES
+-- 27. SECURE PROFILE UPDATE PROTECTION
+--
+-- بازیکن نباید بتواند از Frontend:
+--
+-- coins
+-- level
+-- games_played
+-- games_won
+-- total_tricks
+-- experience
+--
+-- را مستقیماً تغییر دهد.
+-- ================================================================
+
+create or replace function public.protect_profile_economy()
+returns trigger
+language plpgsql
+as $$
+begin
+
+    if auth.uid() is not null then
+
+        if new.coins <> old.coins then
+            raise exception 'coins_can_only_be_changed_by_server';
+        end if;
+
+        if new.level <> old.level then
+            raise exception 'level_can_only_be_changed_by_server';
+        end if;
+
+        if new.games_played <> old.games_played then
+            raise exception 'games_played_can_only_be_changed_by_server';
+        end if;
+
+        if new.games_won <> old.games_won then
+            raise exception 'games_won_can_only_be_changed_by_server';
+        end if;
+
+        if new.total_tricks <> old.total_tricks then
+            raise exception 'total_tricks_can_only_be_changed_by_server';
+        end if;
+
+        if new.experience <> old.experience then
+            raise exception 'experience_can_only_be_changed_by_server';
+        end if;
+
+    end if;
+
+    return new;
+
+end;
+$$;
+
+
+drop trigger if exists protect_profile_economy
+on public.profiles;
+
+create trigger protect_profile_economy
+before update on public.profiles
+for each row
+execute function public.protect_profile_economy();
+
+
+-- ================================================================
+-- 28. SPEND COINS RPC
+--
+-- برای پرداخت 400 سکه ورود بازی
+-- ================================================================
+
+create or replace function public.spend_coins(
+    p_amount bigint,
+    p_transaction_type text,
+    p_description text default null,
+    p_reference_id uuid default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+
+    current_user_id uuid;
+
+    current_balance bigint;
+
+    new_balance bigint;
+
+    transaction_id uuid;
+
+begin
+
+    current_user_id :=
+        auth.uid();
+
+    if current_user_id is null then
+        raise exception 'not_authenticated';
+    end if;
+
+    if p_amount <= 0 then
+        raise exception 'invalid_amount';
+    end if;
+
+    select coins
+    into current_balance
+    from public.profiles
+    where id = current_user_id
+    for update;
+
+    if current_balance is null then
+        raise exception 'profile_not_found';
+    end if;
+
+    if current_balance < p_amount then
+        raise exception 'insufficient_coins';
+    end if;
+
+    new_balance :=
+        current_balance - p_amount;
+
+    update public.profiles
+    set coins = new_balance
+    where id = current_user_id;
+
+    insert into public.coin_transactions (
+        user_id,
+        amount,
+        balance_before,
+        balance_after,
+        transaction_type,
+        description,
+        reference_id
+    )
+    values (
+        current_user_id,
+        -p_amount,
+        current_balance,
+        new_balance,
+        p_transaction_type,
+        p_description,
+        p_reference_id
+    )
+    returning id
+    into transaction_id;
+
+    return jsonb_build_object(
+        'success', true,
+        'transaction_id', transaction_id,
+        'balance_before', current_balance,
+        'balance_after', new_balance,
+        'amount', p_amount
+    );
+
+end;
+$$;
+
+
+-- ================================================================
+-- 29. ADD COINS RPC
+-- ================================================================
+
+create or replace function public.add_coins(
+    p_user_id uuid,
+    p_amount bigint,
+    p_transaction_type text,
+    p_description text default null,
+    p_reference_id uuid default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+
+    current_balance bigint;
+
+    new_balance bigint;
+
+    transaction_id uuid;
+
+begin
+
+    if p_amount <= 0 then
+        raise exception 'invalid_amount';
+    end if;
+
+    select coins
+    into current_balance
+    from public.profiles
+    where id = p_user_id
+    for update;
+
+    if current_balance is null then
+        raise exception 'profile_not_found';
+    end if;
+
+    new_balance :=
+        current_balance + p_amount;
+
+    update public.profiles
+    set coins = new_balance
+    where id = p_user_id;
+
+    insert into public.coin_transactions (
+        user_id,
+        amount,
+        balance_before,
+        balance_after,
+        transaction_type,
+        description,
+        reference_id
+    )
+    values (
+        p_user_id,
+        p_amount,
+        current_balance,
+        new_balance,
+        p_transaction_type,
+        p_description,
+        p_reference_id
+    )
+    returning id
+    into transaction_id;
+
+    return jsonb_build_object(
+        'success', true,
+        'transaction_id', transaction_id,
+        'balance_before', current_balance,
+        'balance_after', new_balance,
+        'amount', p_amount
+    );
+
+end;
+$$;
+
+
+-- ================================================================
+-- 30. PURCHASE SHOP ITEM RPC
+-- ================================================================
+
+create or replace function public.purchase_shop_item(
+    p_item_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+
+    current_user_id uuid;
+
+    item_price bigint;
+
+    item_name text;
+
+    current_balance bigint;
+
+    new_balance bigint;
+
+    inventory_id uuid;
+
+begin
+
+    current_user_id :=
+        auth.uid();
+
+    if current_user_id is null then
+        raise exception 'not_authenticated';
+    end if;
+
+    select
+        price,
+        name
+    into
+        item_price,
+        item_name
+    from public.shop_items
+    where id = p_item_id
+      and is_active = true;
+
+    if item_price is null then
+        raise exception 'item_not_found';
+    end if;
+
+    if exists (
+        select 1
+        from public.player_inventory
+        where user_id = current_user_id
+          and item_id = p_item_id
+    ) then
+        raise exception 'item_already_owned';
+    end if;
+
+    select coins
+    into current_balance
+    from public.profiles
+    where id = current_user_id
+    for update;
+
+    if current_balance < item_price then
+        raise exception 'insufficient_coins';
+    end if;
+
+    new_balance :=
+        current_balance - item_price;
+
+    update public.profiles
+    set coins = new_balance
+    where id = current_user_id;
+
+    insert into public.player_inventory (
+        user_id,
+        item_id
+    )
+    values (
+        current_user_id,
+        p_item_id
+    )
+    returning id
+    into inventory_id;
+
+    insert into public.coin_transactions (
+        user_id,
+        amount,
+        balance_before,
+        balance_after,
+        transaction_type,
+        description,
+        reference_id
+    )
+    values (
+        current_user_id,
+        -item_price,
+        current_balance,
+        new_balance,
+        'shop_purchase',
+        'خرید ' || item_name,
+        p_item_id
+    );
+
+    return jsonb_build_object(
+        'success', true,
+        'inventory_id', inventory_id,
+        'item_id', p_item_id,
+        'price', item_price,
+        'balance_after', new_balance
+    );
+
+end;
+$$;
+
+
+-- ================================================================
+-- 31. PAY GAME ENTRY RPC
+--
+-- هزینه پیش‌فرض بازی = 400 سکه
+-- ================================================================
+
+create or replace function public.pay_game_entry(
+    p_game_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+
+    current_user_id uuid;
+
+    game_entry_fee bigint;
+
+    current_balance bigint;
+
+    new_balance bigint;
+
+    player_exists boolean;
+
+begin
+
+    current_user_id :=
+        auth.uid();
+
+    if current_user_id is null then
+        raise exception 'not_authenticated';
+    end if;
+
+    select entry_fee
+    into game_entry_fee
+    from public.games
+    where id = p_game_id;
+
+    if game_entry_fee is null then
+        raise exception 'game_not_found';
+    end if;
+
+    select exists (
+        select 1
+        from public.game_players
+        where game_id = p_game_id
+          and user_id = current_user_id
+    )
+    into player_exists;
+
+    if not player_exists then
+        raise exception 'player_not_in_game';
+    end if;
+
+    select coins
+    into current_balance
+    from public.profiles
+    where id = current_user_id
+    for update;
+
+    if current_balance < game_entry_fee then
+        raise exception 'insufficient_coins';
+    end if;
+
+    new_balance :=
+        current_balance - game_entry_fee;
+
+    update public.profiles
+    set coins = new_balance
+    where id = current_user_id;
+
+    update public.game_players
+    set final_coins_change =
+        final_coins_change - game_entry_fee
+    where game_id = p_game_id
+      and user_id = current_user_id;
+
+    insert into public.coin_transactions (
+        user_id,
+        amount,
+        balance_before,
+        balance_after,
+        transaction_type,
+        description,
+        reference_id
+    )
+    values (
+        current_user_id,
+        -game_entry_fee,
+        current_balance,
+        new_balance,
+        'game_entry',
+        'هزینه ورود به بازی حکم',
+        p_game_id
+    );
+
+    update public.games
+    set prize_pool =
+        prize_pool + game_entry_fee
+    where id = p_game_id;
+
+    return jsonb_build_object(
+        'success', true,
+        'game_id', p_game_id,
+        'entry_fee', game_entry_fee,
+        'balance_after', new_balance
+    );
+
+end;
+$$;
+
+
+-- ================================================================
+-- 32. PUBLIC CONSTANTS VIEW
+-- ================================================================
+
+create or replace view public.game_constants
+as
+select
+    3000::bigint as starting_coins,
+    400::bigint as game_entry_fee,
+    4::integer as max_players,
+    200::bigint as coins_package_1,
+    25000::bigint as price_package_1,
+    600::bigint as coins_package_2,
+    40000::bigint as price_package_2,
+    1200::bigint as coins_package_3,
+    80000::bigint as price_package_3;
+
+
+-- ================================================================
+-- 33. RLS
+-- ================================================================
+
+alter table public.profiles enable row level security;
+
+alter table public.player_settings enable row level security;
+
+alter table public.shop_items enable row level security;
+
+alter table public.player_inventory enable row level security;
+
+alter table public.coin_transactions enable row level security;
+
+alter table public.coin_packages enable row level security;
+
+alter table public.coin_purchases enable row level security;
+
+alter table public.rooms enable row level security;
+
+alter table public.room_players enable row level security;
+
+alter table public.games enable row level security;
+
+alter table public.game_players enable row level security;
+
+alter table public.game_hands enable row level security;
+
+alter table public.game_tricks enable row level security;
+
+alter table public.trick_cards enable row level security;
+
+alter table public.chat_messages enable row level security;
+
+alter table public.game_history enable row level security;
+
+alter table public.notifications enable row level security;
+
+alter table public.friendships enable row level security;
+
+alter table public.leaderboard_scores enable row level security;
+
+
+-- ================================================================
+-- 34. PROFILE POLICIES
 -- ================================================================
 
 drop policy if exists "profiles_select_authenticated"
@@ -1593,7 +1890,7 @@ with check (auth.uid() = id);
 
 
 -- ================================================================
--- 33. SETTINGS POLICIES
+-- 35. SETTINGS POLICIES
 -- ================================================================
 
 drop policy if exists "settings_select_own"
@@ -1628,21 +1925,7 @@ with check (auth.uid() = user_id);
 
 
 -- ================================================================
--- 34. STATISTICS POLICIES
--- ================================================================
-
-drop policy if exists "statistics_read_authenticated"
-on public.player_statistics;
-
-create policy "statistics_read_authenticated"
-on public.player_statistics
-for select
-to authenticated
-using (true);
-
-
--- ================================================================
--- 35. SHOP POLICIES
+-- 36. SHOP POLICIES
 -- ================================================================
 
 drop policy if exists "shop_items_read"
@@ -1656,7 +1939,7 @@ using (is_active = true);
 
 
 -- ================================================================
--- 36. INVENTORY POLICIES
+-- 37. INVENTORY POLICIES
 -- ================================================================
 
 drop policy if exists "inventory_read_own"
@@ -1670,7 +1953,7 @@ using (auth.uid() = user_id);
 
 
 -- ================================================================
--- 37. COIN TRANSACTION POLICIES
+-- 38. COIN TRANSACTION POLICIES
 -- ================================================================
 
 drop policy if exists "coin_transactions_read_own"
@@ -1684,7 +1967,35 @@ using (auth.uid() = user_id);
 
 
 -- ================================================================
--- 38. ROOM POLICIES
+-- 39. COIN PACKAGE POLICIES
+-- ================================================================
+
+drop policy if exists "coin_packages_read"
+on public.coin_packages;
+
+create policy "coin_packages_read"
+on public.coin_packages
+for select
+to anon, authenticated
+using (is_active = true);
+
+
+-- ================================================================
+-- 40. COIN PURCHASE POLICIES
+-- ================================================================
+
+drop policy if exists "coin_purchases_read_own"
+on public.coin_purchases;
+
+create policy "coin_purchases_read_own"
+on public.coin_purchases
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+
+-- ================================================================
+-- 41. ROOM POLICIES
 -- ================================================================
 
 drop policy if exists "rooms_read_authenticated"
@@ -1719,7 +2030,7 @@ with check (auth.uid() = host_id);
 
 
 -- ================================================================
--- 39. ROOM PLAYERS POLICIES
+-- 42. ROOM PLAYERS
 -- ================================================================
 
 drop policy if exists "room_players_read"
@@ -1754,7 +2065,7 @@ with check (auth.uid() = user_id);
 
 
 -- ================================================================
--- 40. GAME POLICIES
+-- 43. GAMES
 -- ================================================================
 
 drop policy if exists "games_read_authenticated"
@@ -1768,7 +2079,7 @@ using (true);
 
 
 -- ================================================================
--- 41. GAME PLAYERS POLICIES
+-- 44. GAME PLAYERS
 -- ================================================================
 
 drop policy if exists "game_players_read"
@@ -1782,7 +2093,7 @@ using (true);
 
 
 -- ================================================================
--- 42. GAME HANDS POLICIES
+-- 45. GAME HANDS
 -- ================================================================
 
 drop policy if exists "game_hands_own"
@@ -1796,7 +2107,7 @@ using (auth.uid() = user_id);
 
 
 -- ================================================================
--- 43. TRICK POLICIES
+-- 46. TRICKS
 -- ================================================================
 
 drop policy if exists "game_tricks_read"
@@ -1820,21 +2131,7 @@ using (true);
 
 
 -- ================================================================
--- 44. GAME EVENTS
--- ================================================================
-
-drop policy if exists "game_events_read"
-on public.game_events;
-
-create policy "game_events_read"
-on public.game_events
-for select
-to authenticated
-using (true);
-
-
--- ================================================================
--- 45. CHAT POLICIES
+-- 47. CHAT
 -- ================================================================
 
 drop policy if exists "chat_read"
@@ -1858,7 +2155,7 @@ with check (auth.uid() = user_id);
 
 
 -- ================================================================
--- 46. HISTORY POLICIES
+-- 48. HISTORY
 -- ================================================================
 
 drop policy if exists "history_read_own"
@@ -1872,7 +2169,7 @@ using (auth.uid() = user_id);
 
 
 -- ================================================================
--- 47. NOTIFICATION POLICIES
+-- 49. NOTIFICATIONS
 -- ================================================================
 
 drop policy if exists "notifications_read_own"
@@ -1897,7 +2194,7 @@ with check (auth.uid() = user_id);
 
 
 -- ================================================================
--- 48. FRIENDSHIP POLICIES
+-- 50. FRIENDSHIPS
 -- ================================================================
 
 drop policy if exists "friendships_read_own"
@@ -1923,163 +2220,126 @@ to authenticated
 with check (auth.uid() = requester_id);
 
 
-drop policy if exists "friendships_update_participant"
-on public.friendships;
-
-create policy "friendships_update_participant"
-on public.friendships
-for update
-to authenticated
-using (
-    auth.uid() = requester_id
-    or auth.uid() = addressee_id
-)
-with check (
-    auth.uid() = requester_id
-    or auth.uid() = addressee_id
-);
-
-
 -- ================================================================
--- 49. ACHIEVEMENT POLICIES
+-- 51. LEADERBOARD
 -- ================================================================
 
-drop policy if exists "achievements_read"
-on public.achievements;
+drop policy if exists "leaderboard_read"
+on public.leaderboard_scores;
 
-create policy "achievements_read"
-on public.achievements
+create policy "leaderboard_read"
+on public.leaderboard_scores
 for select
 to authenticated
-using (is_active = true);
-
-
-drop policy if exists "player_achievements_read_own"
-on public.player_achievements;
-
-create policy "player_achievements_read_own"
-on public.player_achievements
-for select
-to authenticated
-using (auth.uid() = user_id);
+using (true);
 
 
 -- ================================================================
--- 50. DAILY REWARD POLICIES
--- ================================================================
-
-drop policy if exists "daily_rewards_read_own"
-on public.daily_rewards;
-
-create policy "daily_rewards_read_own"
-on public.daily_rewards
-for select
-to authenticated
-using (auth.uid() = user_id);
-
-
--- ================================================================
--- 51. REPORT POLICIES
--- ================================================================
-
-drop policy if exists "reports_insert_own"
-on public.player_reports;
-
-create policy "reports_insert_own"
-on public.player_reports
-for insert
-to authenticated
-with check (auth.uid() = reporter_id);
-
-
-drop policy if exists "reports_read_own"
-on public.player_reports;
-
-create policy "reports_read_own"
-on public.player_reports
-for select
-to authenticated
-using (auth.uid() = reporter_id);
-
-
--- ================================================================
--- 52. REALTIME PUBLICATION
+-- 52. REALTIME
 -- ================================================================
 
 do $$
+
 begin
 
     begin
         alter publication supabase_realtime
         add table public.rooms;
     exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.room_players;
     exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.games;
     exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.game_players;
     exception
-        when duplicate_object then null;
-    end;
-
-    begin
-        alter publication supabase_realtime
-        add table public.game_hands;
-    exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.game_tricks;
     exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.trick_cards;
     exception
-        when duplicate_object then null;
-    end;
-
-    begin
-        alter publication supabase_realtime
-        add table public.game_events;
-    exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
     begin
         alter publication supabase_realtime
         add table public.chat_messages;
     exception
-        when duplicate_object then null;
+        when duplicate_object then
+            null;
     end;
 
-end
-$$;
+end $$;
 
 
 -- ================================================================
--- 53. FINAL STATUS
+-- 53. GRANTS FOR RPC
+-- ================================================================
+
+grant execute
+on function public.spend_coins(
+    bigint,
+    text,
+    text,
+    uuid
+)
+to authenticated;
+
+
+grant execute
+on function public.purchase_shop_item(
+    uuid
+)
+to authenticated;
+
+
+grant execute
+on function public.pay_game_entry(
+    uuid
+)
+to authenticated;
+
+
+-- ================================================================
+-- 54. FINAL STATUS
 -- ================================================================
 
 select
-    'Hokm Online Complete Database v2.0 installed successfully.'
-    as status;
+    'HOKM ONLINE DATABASE INSTALLED SUCCESSFULLY' as status,
+    3000::bigint as starting_coins,
+    400::bigint as game_entry_fee,
+    200::bigint as package_1_coins,
+    25000::bigint as package_1_price_toman,
+    600::bigint as package_2_coins,
+    40000::bigint as package_2_price_toman,
+    1200::bigint as package_3_coins,
+    80000::bigint as package_3_price_toman;
