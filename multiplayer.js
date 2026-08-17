@@ -1,2706 +1,5663 @@
-/* =========================================================
-   HOKM ONLINE
-   MULTIPLAYER.JS
-   مرحله ۷ — سیستم اتاق و بازیکنان آنلاین
-   ========================================================= */
+"use strict";
 
-(function () {
-    "use strict";
-
-
-    /* =======================================================
-       GLOBAL STATE
-    ======================================================== */
-
-    window.Multiplayer = {
-
-        initialized: false,
-
-        connected: false,
-
-        channel: null,
-
-        roomCode: null,
-
-        roomName: "",
-
-        isHost: false,
-
-        playerId: null,
-
-        players: [],
-
-        maxPlayers: 4,
-
-        roomState: {
-            status: "waiting",
-            hostId: null,
-            players: []
-        },
-
-        reconnectAttempts: 0,
-
-        maxReconnectAttempts: 5
-
-    };
-
-
-    /* =======================================================
-       HELPERS
-    ======================================================== */
-
-    function log(...args) {
-        console.log("[MULTIPLAYER]", ...args);
-    }
-
-
-    function warn(...args) {
-        console.warn("[MULTIPLAYER]", ...args);
-    }
+/*
+ * ================================================================
+ * HOKM ONLINE
+ * multiplayer.js
+ *
+ * FILE 03 / 12
+ *
+ * سیستم کامل Multiplayer و Realtime
+ *
+ * مسئولیت‌ها:
+ *
+ * - اتصال بازیکن به بازی آنلاین
+ * - اتصال به Supabase Realtime
+ * - مدیریت Room
+ * - مدیریت بازیکنان اتاق
+ * - حضور آنلاین بازیکنان
+ * - دریافت Join / Leave
+ * - همگام‌سازی وضعیت بازی
+ * - ارسال حرکت بازیکن
+ * - دریافت حرکت بازیکنان
+ * - ارسال وضعیت بازی
+ * - دریافت وضعیت بازی
+ * - مدیریت Turn
+ * - مدیریت Ready
+ * - مدیریت شروع بازی
+ * - مدیریت پایان بازی
+ * - مدیریت reconnect
+ * - مدیریت disconnect
+ * - Heartbeat
+ * - جلوگیری از ارسال حرکت غیرمجاز
+ * - جلوگیری از ارسال تکراری حرکت
+ * - هماهنگی با room.js
+ * - هماهنگی با game.js
+ * - هماهنگی با chat.js
+ * - هماهنگی با ui.js
+ * - هماهنگی با profile.js
+ * - Event System
+ * - Queue پیام‌ها
+ * - Retry
+ * - Timeout
+ * - مدیریت خطا
+ *
+ * سازگار با:
+ *
+ * config.js
+ * auth.js
+ * room.js
+ * game.js
+ * chat.js
+ * profile.js
+ * ui.js
+ *
+ * ================================================================
+ */
 
 
-    function error(...args) {
-        console.error("[MULTIPLAYER]", ...args);
-    }
+/* ================================================================
+   1. GLOBAL CONFIGURATION
+================================================================ */
+
+const MULTIPLAYER_CONFIG = {
+
+    heartbeatInterval:
+        15000,
+
+    connectionTimeout:
+        10000,
+
+    reconnectDelay:
+        2500,
+
+    maxReconnectAttempts:
+        10,
+
+    messageTimeout:
+        8000,
+
+    maxPendingMessages:
+        100,
+
+    maxPlayersPerRoom:
+        4,
+
+    maxStateSize:
+        200000,
+
+    version:
+        "1.0.0"
+
+};
 
 
-    function generatePlayerId() {
+/* ================================================================
+   2. MULTIPLAYER STATE
+================================================================ */
 
-        let id = localStorage.getItem("hokm_player_id");
+const multiplayerState = {
 
-        if (!id) {
+    initialized:
+        false,
 
-            id =
-                "player_" +
-                Date.now().toString(36) +
-                "_" +
-                Math.random()
-                    .toString(36)
-                    .substring(2, 10);
+    connected:
+        false,
 
-            localStorage.setItem(
-                "hokm_player_id",
-                id
-            );
+    connecting:
+        false,
+
+    reconnecting:
+        false,
+
+    roomId:
+        null,
+
+    channel:
+        null,
+
+    channelName:
+        null,
+
+    connectionStatus:
+        "disconnected",
+
+    connectionError:
+        null,
+
+    reconnectAttempts:
+        0,
+
+    lastConnectionAt:
+        null,
+
+    lastHeartbeatAt:
+        null,
+
+    lastMessageAt:
+        null,
+
+    lastActionId:
+        null,
+
+    sequence:
+        0,
+
+    players:
+        [],
+
+    playerMap:
+        {},
+
+    readyPlayers:
+        {},
+
+    currentTurn:
+        null,
+
+    gameStarted:
+        false,
+
+    gameFinished:
+        false,
+
+    gameStateVersion:
+        0,
+
+    lastGameState:
+        null,
+
+    pendingMessages:
+        [],
+
+    pendingActions:
+        [],
+
+    sentActions:
+        {},
+
+    receivedActions:
+        {},
+
+    presence:
+        {},
+
+    localPlayerId:
+        null,
+
+    localPlayerName:
+        null,
+
+    localPlayerSeat:
+        null,
+
+    isHost:
+        false,
+
+    hostId:
+        null,
+
+    heartbeatTimer:
+        null,
+
+    reconnectTimer:
+        null,
+
+    connectionTimer:
+        null,
+
+    initializedAt:
+        null
+
+};
+
+
+/* ================================================================
+   3. EVENT SYSTEM
+================================================================ */
+
+const multiplayerEvents = {
+
+    listeners: {},
+
+
+    on(
+        eventName,
+        callback
+    ) {
+
+        if (
+            typeof callback !== "function"
+        ) {
+
+            return function () {};
         }
 
-        return id;
-    }
+
+        if (
+            !this.listeners[eventName]
+        ) {
+
+            this.listeners[eventName] = [];
+        }
 
 
-    function generateRoomCode() {
-
-        return Math.floor(
-            100000 +
-            Math.random() * 900000
-        ).toString();
-
-    }
+        this.listeners[eventName].push(
+            callback
+        );
 
 
-    function getPlayerName() {
+        return function unsubscribe() {
 
-        const possibleIds = [
-            "playerName",
-            "profileName"
-        ];
+            const list =
+                multiplayerEvents.listeners[eventName];
 
-        for (const id of possibleIds) {
 
-            const element =
-                document.getElementById(id);
+            if (!list) {
+
+                return;
+            }
+
+
+            const index =
+                list.indexOf(callback);
+
 
             if (
-                element &&
-                element.textContent.trim()
+                index !== -1
             ) {
 
-                const name =
-                    element.textContent.trim();
-
-                if (
-                    name !== "بازیکن مهمان" &&
-                    name !== "بازیکن"
-                ) {
-                    return name;
-                }
-            }
-        }
-
-
-        const savedName =
-            localStorage.getItem(
-                "hokm_player_name"
-            );
-
-        if (savedName) {
-            return savedName;
-        }
-
-
-        return "بازیکن مهمان";
-    }
-
-
-    function getAvatar() {
-
-        const savedAvatar =
-            localStorage.getItem(
-                "hokm_player_avatar"
-            );
-
-        return savedAvatar || "👤";
-    }
-
-
-    function showToast(
-        message,
-        type = "info"
-    ) {
-
-        if (
-            typeof window.showToast ===
-            "function"
-        ) {
-
-            window.showToast(
-                message,
-                type
-            );
-
-            return;
-        }
-
-
-        const toast =
-            document.getElementById(
-                "toast"
-            );
-
-        const toastMessage =
-            document.getElementById(
-                "toastMessage"
-            );
-
-        if (
-            toast &&
-            toastMessage
-        ) {
-
-            toastMessage.textContent =
-                message;
-
-            toast.classList.add("show");
-
-            setTimeout(() => {
-
-                toast.classList.remove(
-                    "show"
+                list.splice(
+                    index,
+                    1
                 );
+            }
 
-            }, 3000);
+        };
 
-        }
-
-    }
+    },
 
 
-    function setLoading(
-        visible,
-        message = "لطفاً صبر کنید..."
+    emit(
+        eventName,
+        data
     ) {
 
-        const overlay =
-            document.getElementById(
-                "loadingOverlay"
-            );
+        const list =
+            this.listeners[eventName] || [];
 
-        const messageElement =
-            document.getElementById(
-                "loadingMessage"
-            );
 
-        if (messageElement) {
+        list.slice().forEach(
+            callback => {
 
-            messageElement.textContent =
-                message;
+                try {
 
-        }
+                    callback(data);
 
-        if (!overlay) {
+                } catch (error) {
+
+                    console.error(
+                        "Multiplayer Event Error:",
+                        eventName,
+                        error
+                    );
+
+                }
+
+            }
+        );
+
+    },
+
+
+    off(
+        eventName,
+        callback
+    ) {
+
+        if (
+            !this.listeners[eventName]
+        ) {
+
             return;
         }
 
-        if (visible) {
 
-            overlay.classList.remove(
-                "hidden"
+        this.listeners[eventName] =
+            this.listeners[eventName].filter(
+                item =>
+                    item !== callback
             );
 
-        } else {
+    },
 
-            overlay.classList.add(
-                "hidden"
-            );
 
-        }
+    clear() {
+
+        this.listeners = {};
+
+    }
+
+};
+
+
+/* ================================================================
+   4. UTILITY FUNCTIONS
+================================================================ */
+
+function multiplayerToast(
+    message,
+    icon = "ℹ️",
+    duration = 3000
+) {
+
+    if (
+        typeof window.showToast === "function"
+    ) {
+
+        window.showToast(
+            message,
+            icon,
+            duration
+        );
+
+        return;
+    }
+
+
+    console.log(
+        icon,
+        message
+    );
+
+}
+
+
+function multiplayerLoading(
+    show,
+    message = "لطفاً صبر کنید..."
+) {
+
+    if (
+        show &&
+        typeof window.showLoading === "function"
+    ) {
+
+        window.showLoading(
+            message
+        );
+
+        return;
+    }
+
+
+    if (
+        !show &&
+        typeof window.hideLoading === "function"
+    ) {
+
+        window.hideLoading();
+
+    }
+
+}
+
+
+function generateId(
+    prefix = "mp"
+) {
+
+    return (
+        prefix +
+        "_" +
+        Date.now().toString(36) +
+        "_" +
+        Math.random()
+            .toString(36)
+            .substring(2, 10)
+    );
+
+}
+
+
+function now() {
+
+    return Date.now();
+
+}
+
+
+function cloneData(
+    data
+) {
+
+    if (
+        data === undefined ||
+        data === null
+    ) {
+
+        return data;
 
     }
 
 
-    /* =======================================================
-       SUPABASE ACCESS
-    ======================================================== */
+    try {
 
-    function getSupabaseClient() {
+        return JSON.parse(
+            JSON.stringify(data)
+        );
 
-        if (
-            window.supabaseClient
-        ) {
-            return window.supabaseClient;
-        }
+    } catch (error) {
 
-
-        if (
-            window.SupabaseClient
-        ) {
-            return window.SupabaseClient;
-        }
-
-
-        if (
-            window.db &&
-            window.db.supabase
-        ) {
-            return window.db.supabase;
-        }
-
+        console.error(
+            "Clone multiplayer data failed:",
+            error
+        );
 
         return null;
 
     }
 
-
-    /* =======================================================
-       INITIALIZE
-    ======================================================== */
-
-    function initialize() {
-
-        if (
-            Multiplayer.initialized
-        ) {
-            return;
-        }
+}
 
 
-        Multiplayer.playerId =
-            generatePlayerId();
+function safeString(
+    value,
+    fallback = ""
+) {
 
+    if (
+        value === undefined ||
+        value === null
+    ) {
 
-        Multiplayer.initialized =
-            true;
-
-
-        log(
-            "Multiplayer initialized",
-            Multiplayer.playerId
-        );
+        return fallback;
 
     }
 
 
-    /* =======================================================
-       CREATE ROOM
-    ======================================================== */
+    return String(value);
 
-    async function createRoom(
-        options = {}
+}
+
+
+function safeNumber(
+    value,
+    fallback = 0
+) {
+
+    const number =
+        Number(value);
+
+
+    return Number.isFinite(number)
+        ? number
+        : fallback;
+
+}
+
+
+function isObject(
+    value
+) {
+
+    return (
+        value !== null &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    );
+
+}
+
+
+/* ================================================================
+   5. GET SUPABASE CLIENT
+================================================================ */
+
+function getMultiplayerSupabaseClient() {
+
+    if (
+        window.supabaseClient &&
+        typeof window.supabaseClient.channel === "function"
     ) {
 
-        initialize();
-
-
-        const client =
-            getSupabaseClient();
-
-
-        const roomName =
-            options.roomName ||
-            "اتاق حکم";
-
-
-        const entryFee =
-            Number(
-                options.entryFee || 0
-            );
-
-
-        const isPrivate =
-            options.isPrivate !== false;
-
-
-        const player = {
-
-            id: Multiplayer.playerId,
-
-            name: getPlayerName(),
-
-            avatar: getAvatar(),
-
-            seat: 0,
-
-            ready: true,
-
-            joinedAt:
-                new Date().toISOString()
-
-        };
-
-
-        setLoading(
-            true,
-            "در حال ساخت اتاق..."
-        );
-
-
-        try {
-
-            /*
-             * اگر Supabase متصل باشد،
-             * اتاق واقعی در دیتابیس ساخته می‌شود.
-             */
-
-            if (client) {
-
-                const roomCode =
-                    generateRoomCode();
-
-
-                const roomData = {
-
-                    room_code: roomCode,
-
-                    name: roomName,
-
-                    host_id:
-                        Multiplayer.playerId,
-
-                    max_players: 4,
-
-                    entry_fee: entryFee,
-
-                    is_private: isPrivate,
-
-                    status: "waiting"
-
-                };
-
-
-                const result =
-                    await client
-                        .from("rooms")
-                        .insert(
-                            roomData
-                        )
-                        .select()
-                        .single();
-
-
-                if (
-                    result.error
-                ) {
-
-                    throw result.error;
-
-                }
-
-
-                Multiplayer.roomCode =
-                    roomCode;
-
-                Multiplayer.roomName =
-                    roomName;
-
-                Multiplayer.isHost =
-                    true;
-
-
-                Multiplayer.roomState = {
-
-                    status: "waiting",
-
-                    hostId:
-                        Multiplayer.playerId,
-
-                    players: [player]
-
-                };
-
-
-                Multiplayer.players =
-                    [player];
-
-
-                await joinRealtimeRoom(
-                    roomCode
-                );
-
-
-                await addPlayerToRoom(
-                    roomCode,
-                    player
-                );
-
-
-                updateRoomUI();
-
-
-                showToast(
-                    "اتاق با موفقیت ساخته شد",
-                    "success"
-                );
-
-
-                return {
-
-                    success: true,
-
-                    roomCode,
-
-                    roomName,
-
-                    isHost: true
-
-                };
-
-            }
-
-
-            /*
-             * حالت محلی برای زمانی که
-             * هنوز Supabase تنظیم نشده است.
-             */
-
-            const localRoomCode =
-                generateRoomCode();
-
-
-            Multiplayer.roomCode =
-                localRoomCode;
-
-            Multiplayer.roomName =
-                roomName;
-
-            Multiplayer.isHost =
-                true;
-
-
-            Multiplayer.roomState = {
-
-                status: "waiting",
-
-                hostId:
-                    Multiplayer.playerId,
-
-                players: [player]
-
-            };
-
-
-            Multiplayer.players =
-                [player];
-
-
-            saveLocalRoom();
-
-
-            updateRoomUI();
-
-
-            showToast(
-                `اتاق ساخته شد — کد: ${localRoomCode}`,
-                "success"
-            );
-
-
-            return {
-
-                success: true,
-
-                roomCode:
-                    localRoomCode,
-
-                roomName,
-
-                isHost: true,
-
-                local: true
-
-            };
-
-        } catch (err) {
-
-            error(
-                "Create room error:",
-                err
-            );
-
-
-            showToast(
-                "ساخت اتاق با خطا مواجه شد",
-                "error"
-            );
-
-
-            return {
-
-                success: false,
-
-                error: err
-
-            };
-
-        } finally {
-
-            setLoading(
-                false
-            );
-
-        }
+        return window.supabaseClient;
 
     }
 
 
-    /* =======================================================
-       JOIN ROOM
-    ======================================================== */
-
-    async function joinRoom(
-        roomCode
+    if (
+        window.supabase &&
+        typeof window.supabase.channel === "function"
     ) {
 
-        initialize();
-
-
-        roomCode =
-            String(roomCode || "")
-                .replace(
-                    /\D/g,
-                    ""
-                )
-                .trim();
-
-
-        if (
-            roomCode.length !== 6
-        ) {
-
-            showToast(
-                "کد اتاق باید ۶ رقمی باشد",
-                "error"
-            );
-
-            return {
-                success: false
-            };
-
-        }
-
-
-        const client =
-            getSupabaseClient();
-
-
-        setLoading(
-            true,
-            "در حال ورود به اتاق..."
-        );
-
-
-        try {
-
-            if (client) {
-
-                const roomResult =
-                    await client
-                        .from("rooms")
-                        .select("*")
-                        .eq(
-                            "room_code",
-                            roomCode
-                        )
-                        .single();
-
-
-                if (
-                    roomResult.error ||
-                    !roomResult.data
-                ) {
-
-                    throw new Error(
-                        "اتاق پیدا نشد"
-                    );
-
-                }
-
-
-                const room =
-                    roomResult.data;
-
-
-                if (
-                    room.status !==
-                    "waiting"
-                ) {
-
-                    throw new Error(
-                        "این اتاق دیگر قابل ورود نیست"
-                    );
-
-                }
-
-
-                const players =
-                    await getRoomPlayers(
-                        roomCode
-                    );
-
-
-                if (
-                    players.length >= 4
-                ) {
-
-                    throw new Error(
-                        "اتاق پر است"
-                    );
-
-                }
-
-
-                const player = {
-
-                    id:
-                        Multiplayer.playerId,
-
-                    name:
-                        getPlayerName(),
-
-                    avatar:
-                        getAvatar(),
-
-                    seat:
-                        findFreeSeat(
-                            players
-                        ),
-
-                    ready: true,
-
-                    joinedAt:
-                        new Date()
-                            .toISOString()
-
-                };
-
-
-                Multiplayer.roomCode =
-                    roomCode;
-
-                Multiplayer.roomName =
-                    room.name || "اتاق حکم";
-
-                Multiplayer.isHost =
-                    room.host_id ===
-                    Multiplayer.playerId;
-
-
-                await addPlayerToRoom(
-                    roomCode,
-                    player
-                );
-
-
-                Multiplayer.players =
-                    [
-                        ...players,
-                        player
-                    ];
-
-
-                Multiplayer.roomState = {
-
-                    status:
-                        room.status,
-
-                    hostId:
-                        room.host_id,
-
-                    players:
-                        Multiplayer.players
-
-                };
-
-
-                await joinRealtimeRoom(
-                    roomCode
-                );
-
-
-                updateRoomUI();
-
-
-                showToast(
-                    "با موفقیت وارد اتاق شدی",
-                    "success"
-                );
-
-
-                return {
-
-                    success: true,
-
-                    roomCode,
-
-                    players:
-                        Multiplayer.players
-
-                };
-
-            }
-
-
-            /*
-             * حالت Local
-             */
-
-            const localRoom =
-                loadLocalRoom(
-                    roomCode
-                );
-
-
-            if (!localRoom) {
-
-                throw new Error(
-                    "اتاق پیدا نشد"
-                );
-
-            }
-
-
-            if (
-                localRoom.players
-                    .length >= 4
-            ) {
-
-                throw new Error(
-                    "اتاق پر است"
-                );
-
-            }
-
-
-            const player = {
-
-                id:
-                    Multiplayer.playerId,
-
-                name:
-                    getPlayerName(),
-
-                avatar:
-                    getAvatar(),
-
-                seat:
-                    findFreeSeat(
-                        localRoom.players
-                    ),
-
-                ready: true,
-
-                joinedAt:
-                    new Date()
-                        .toISOString()
-
-            };
-
-
-            localRoom.players.push(
-                player
-            );
-
-
-            Multiplayer.roomCode =
-                roomCode;
-
-            Multiplayer.roomName =
-                localRoom.name;
-
-            Multiplayer.isHost =
-                localRoom.hostId ===
-                Multiplayer.playerId;
-
-
-            Multiplayer.players =
-                localRoom.players;
-
-
-            Multiplayer.roomState =
-                localRoom;
-
-
-            saveLocalRoom();
-
-
-            updateRoomUI();
-
-
-            showToast(
-                "با موفقیت وارد اتاق شدی",
-                "success"
-            );
-
-
-            return {
-
-                success: true,
-
-                roomCode,
-
-                players:
-                    Multiplayer.players,
-
-                local: true
-
-            };
-
-        } catch (err) {
-
-            error(
-                "Join room error:",
-                err
-            );
-
-
-            showToast(
-                err.message ||
-                "ورود به اتاق انجام نشد",
-                "error"
-            );
-
-
-            return {
-
-                success: false,
-
-                error: err
-
-            };
-
-        } finally {
-
-            setLoading(
-                false
-            );
-
-        }
+        return window.supabase;
 
     }
 
 
-    /* =======================================================
-       GET ROOM PLAYERS
-    ======================================================== */
+    console.error(
+        "Supabase Client برای Multiplayer پیدا نشد."
+    );
 
-    async function getRoomPlayers(
-        roomCode
+
+    return null;
+
+}
+
+
+/* ================================================================
+   6. GET CURRENT USER
+================================================================ */
+
+function getMultiplayerUser() {
+
+    if (
+        typeof window.getCurrentUser === "function"
     ) {
 
-        const client =
-            getSupabaseClient();
-
-
-        if (!client) {
-
-            const room =
-                loadLocalRoom(
-                    roomCode
-                );
-
-            return room
-                ? room.players
-                : [];
-
-        }
-
-
-        const result =
-            await client
-                .from("room_players")
-                .select("*")
-                .eq(
-                    "room_code",
-                    roomCode
-                )
-                .order(
-                    "seat",
-                    {
-                        ascending: true
-                    }
-                );
-
-
-        if (
-            result.error
-        ) {
-
-            throw result.error;
-
-        }
-
-
-        return result.data || [];
+        return window.getCurrentUser();
 
     }
 
 
-    /* =======================================================
-       ADD PLAYER TO ROOM
-    ======================================================== */
-
-    async function addPlayerToRoom(
-        roomCode,
-        player
+    if (
+        window.hokmAuth &&
+        typeof window.hokmAuth.getCurrentUser === "function"
     ) {
 
-        const client =
-            getSupabaseClient();
+        return window.hokmAuth.getCurrentUser();
+
+    }
 
 
-        if (!client) {
-            return true;
-        }
+    return null;
+
+}
 
 
-        const result =
-            await client
-                .from("room_players")
-                .upsert(
+/* ================================================================
+   7. GET CURRENT USER ID
+================================================================ */
 
-                    {
+function getMultiplayerUserId() {
 
-                        room_code:
-                            roomCode,
-
-                        player_id:
-                            player.id,
-
-                        player_name:
-                            player.name,
-
-                        avatar:
-                            player.avatar,
-
-                        seat:
-                            player.seat,
-
-                        ready:
-                            player.ready
-
-                    },
-
-                    {
-
-                        onConflict:
-                            "room_code,player_id"
-
-                    }
-
-                );
+    const user =
+        getMultiplayerUser();
 
 
-        if (
-            result.error
-        ) {
+    if (
+        user?.id
+    ) {
 
-            throw result.error;
+        return user.id;
 
-        }
+    }
 
+
+    if (
+        multiplayerState.localPlayerId
+    ) {
+
+        return multiplayerState.localPlayerId;
+
+    }
+
+
+    return null;
+
+}
+
+
+/* ================================================================
+   8. GET CURRENT PLAYER NAME
+================================================================ */
+
+function getMultiplayerPlayerName() {
+
+    if (
+        multiplayerState.localPlayerName
+    ) {
+
+        return multiplayerState.localPlayerName;
+
+    }
+
+
+    if (
+        typeof window.getProfileDisplayName === "function"
+    ) {
+
+        return window.getProfileDisplayName();
+
+    }
+
+
+    if (
+        window.hokmAuth &&
+        typeof window.hokmAuth.getProfileDisplayName === "function"
+    ) {
+
+        return window.hokmAuth.getProfileDisplayName();
+
+    }
+
+
+    const user =
+        getMultiplayerUser();
+
+
+    return (
+        user?.user_metadata?.display_name ||
+        user?.user_metadata?.username ||
+        "بازیکن"
+    );
+
+}
+
+
+/* ================================================================
+   9. INITIALIZE MULTIPLAYER
+================================================================ */
+
+function initializeMultiplayer() {
+
+    if (
+        multiplayerState.initialized
+    ) {
 
         return true;
 
     }
 
 
-    /* =======================================================
-       FIND FREE SEAT
-    ======================================================== */
-
-    function findFreeSeat(
-        players
-    ) {
-
-        const usedSeats =
-            players.map(
-                player =>
-                    Number(player.seat)
-            );
+    const client =
+        getMultiplayerSupabaseClient();
 
 
-        for (
-            let seat = 0;
-            seat < 4;
-            seat++
-        ) {
+    if (!client) {
 
-            if (
-                !usedSeats.includes(
-                    seat
-                )
-            ) {
+        console.warn(
+            "Multiplayer initialization منتظر Supabase است."
+        );
 
-                return seat;
-
-            }
-
-        }
-
-
-        return -1;
+        return false;
 
     }
 
 
-    /* =======================================================
-       REALTIME CONNECTION
-    ======================================================== */
+    multiplayerState.localPlayerId =
+        getMultiplayerUserId();
 
-    async function joinRealtimeRoom(
-        roomCode
+
+    multiplayerState.localPlayerName =
+        getMultiplayerPlayerName();
+
+
+    multiplayerState.initialized =
+        true;
+
+
+    multiplayerState.initializedAt =
+        now();
+
+
+    setupAuthIntegration();
+
+
+    multiplayerEvents.emit(
+        "initialized",
+        getMultiplayerPublicState()
+    );
+
+
+    console.log(
+        "Hokm Online Multiplayer initialized."
+    );
+
+
+    return true;
+
+}
+
+
+/* ================================================================
+   10. AUTH INTEGRATION
+================================================================ */
+
+function setupAuthIntegration() {
+
+    if (
+        window.hokmAuth &&
+        typeof window.hokmAuth.onAuthChange === "function"
     ) {
 
-        const client =
-            getSupabaseClient();
+        window.hokmAuth.onAuthChange(
+            data => {
+
+                const user =
+                    data?.user ||
+                    getMultiplayerUser();
 
 
-        if (!client) {
+                if (user) {
 
-            log(
-                "Supabase unavailable — local mode"
-            );
-
-            return;
-
-        }
+                    multiplayerState.localPlayerId =
+                        user.id;
 
 
-        if (
-            Multiplayer.channel
-        ) {
+                    multiplayerState.localPlayerName =
+                        getMultiplayerPlayerName();
 
-            try {
-
-                await client
-                    .removeChannel(
-                        Multiplayer.channel
-                    );
-
-            } catch (e) {
-
-                warn(
-                    "Previous channel removal failed",
-                    e
-                );
+                }
 
             }
+        );
 
-        }
+    }
 
+}
+
+
+/* ================================================================
+   11. CREATE CHANNEL NAME
+================================================================ */
+
+function createChannelName(
+    roomId
+) {
+
+    return (
+        "hokm-room-" +
+        safeString(roomId)
+    );
+
+}
+
+
+/* ================================================================
+   12. CONNECT TO ROOM
+================================================================ */
+
+async function connectToRoom(
+    roomId,
+    options = {}
+) {
+
+    initializeMultiplayer();
+
+
+    const client =
+        getMultiplayerSupabaseClient();
+
+
+    if (!client) {
+
+        multiplayerToast(
+            "اتصال به سرور آماده نیست.",
+            "⚠️"
+        );
+
+
+        return {
+            success: false,
+            error: "SUPABASE_CLIENT_NOT_FOUND"
+        };
+
+    }
+
+
+    if (!roomId) {
+
+        multiplayerToast(
+            "شناسه اتاق معتبر نیست.",
+            "⚠️"
+        );
+
+
+        return {
+            success: false,
+            error: "ROOM_ID_REQUIRED"
+        };
+
+    }
+
+
+    roomId =
+        safeString(roomId).trim();
+
+
+    if (
+        multiplayerState.roomId === roomId &&
+        multiplayerState.connected
+    ) {
+
+        return {
+            success: true,
+            alreadyConnected: true
+        };
+
+    }
+
+
+    await disconnectFromRoom(
+        false
+    );
+
+
+    multiplayerState.roomId =
+        roomId;
+
+
+    multiplayerState.localPlayerId =
+        getMultiplayerUserId();
+
+
+    multiplayerState.localPlayerName =
+        getMultiplayerPlayerName();
+
+
+    multiplayerState.connectionStatus =
+        "connecting";
+
+
+    multiplayerState.connecting =
+        true;
+
+
+    multiplayerState.connectionError =
+        null;
+
+
+    multiplayerEvents.emit(
+        "connectionStateChanged",
+        getMultiplayerPublicState()
+    );
+
+
+    multiplayerLoading(
+        true,
+        "در حال اتصال به بازی..."
+    );
+
+
+    try {
 
         const channelName =
-            `hokm-room-${roomCode}`;
+            createChannelName(
+                roomId
+            );
+
+
+        multiplayerState.channelName =
+            channelName;
 
 
         const channel =
             client.channel(
                 channelName,
                 {
+
                     config: {
+
                         presence: {
+
                             key:
-                                Multiplayer.playerId
+                                multiplayerState.localPlayerId ||
+                                generateId("guest")
+
+                        },
+
+                        broadcast: {
+
+                            self:
+                                false,
+
+                            ack:
+                                true
+
                         }
+
                     }
+
                 }
             );
 
 
-        Multiplayer.channel =
+        multiplayerState.channel =
             channel;
 
 
-        channel
-            .on(
-                "presence",
-                {
-                    event:
-                        "sync"
-                },
-                () => {
+        setupChannelListeners(
+            channel
+        );
 
-                    handlePresenceSync();
 
-                }
-            )
-            .on(
-                "presence",
-                {
-                    event:
-                        "join"
-                },
-                payload => {
+        const timeoutPromise =
+            new Promise(
+                (_, reject) => {
 
-                    log(
-                        "Player joined:",
-                        payload
-                    );
+                    multiplayerState.connectionTimer =
+                        setTimeout(
+                            () => {
 
-                    handlePresenceSync();
+                                reject(
+                                    new Error(
+                                        "اتصال به اتاق بیش از حد طول کشید."
+                                    )
+                                );
+
+                            },
+                            MULTIPLAYER_CONFIG.connectionTimeout
+                        );
 
                 }
-            )
-            .on(
-                "presence",
-                {
-                    event:
-                        "leave"
-                },
-                payload => {
+            );
 
-                    log(
-                        "Player left:",
-                        payload
-                    );
 
-                    handlePresenceSync();
+        const subscribePromise =
+            new Promise(
+                (resolve, reject) => {
 
-                }
-            )
-            .on(
-                "broadcast",
-                {
-                    event:
-                        "room_update"
-                },
-                payload => {
+                    channel.subscribe(
+                        status => {
 
-                    handleRoomUpdate(
-                        payload
-                    );
+                            if (
+                                status === "SUBSCRIBED"
+                            ) {
 
-                }
-            )
-            .on(
-                "broadcast",
-                {
-                    event:
-                        "game_start"
-                },
-                payload => {
+                                if (
+                                    multiplayerState.connectionTimer
+                                ) {
 
-                    handleGameStart(
-                        payload
+                                    clearTimeout(
+                                        multiplayerState.connectionTimer
+                                    );
+
+                                    multiplayerState.connectionTimer =
+                                        null;
+
+                                }
+
+
+                                resolve(
+                                    status
+                                );
+
+                            }
+
+
+                            if (
+                                status === "CHANNEL_ERROR"
+                            ) {
+
+                                reject(
+                                    new Error(
+                                        "CHANNEL_ERROR"
+                                    )
+                                );
+
+                            }
+
+
+                            if (
+                                status === "TIMED_OUT"
+                            ) {
+
+                                reject(
+                                    new Error(
+                                        "CHANNEL_TIMED_OUT"
+                                    )
+                                );
+
+                            }
+
+                        }
                     );
 
                 }
             );
 
 
-        const status =
-            await channel.subscribe(
-                async status => {
-
-                    if (
-                        status ===
-                        "SUBSCRIBED"
-                    ) {
-
-                        Multiplayer.connected =
-                            true;
-
-                        Multiplayer.reconnectAttempts =
-                            0;
+        await Promise.race(
+            [
+                subscribePromise,
+                timeoutPromise
+            ]
+        );
 
 
-                        await channel
-                            .track({
-
-                                id:
-                                    Multiplayer.playerId,
-
-                                name:
-                                    getPlayerName(),
-
-                                avatar:
-                                    getAvatar(),
-
-                                seat:
-                                    getCurrentSeat(),
-
-                                roomCode
-
-                            });
+        multiplayerState.connected =
+            true;
 
 
-                        log(
-                            "Connected to room",
-                            roomCode
-                        );
-
-                    }
+        multiplayerState.connecting =
+            false;
 
 
-                    if (
-                        status ===
-                        "CHANNEL_ERROR"
-                    ) {
-
-                        Multiplayer.connected =
-                            false;
-
-                        warn(
-                            "Realtime channel error"
-                        );
-
-                        tryReconnect();
-
-                    }
+        multiplayerState.reconnecting =
+            false;
 
 
-                    if (
-                        status ===
-                        "TIMED_OUT"
-                    ) {
-
-                        Multiplayer.connected =
-                            false;
-
-                        warn(
-                            "Realtime timeout"
-                        );
-
-                        tryReconnect();
-
-                    }
-
-                }
-            );
+        multiplayerState.connectionStatus =
+            "connected";
 
 
-        return status;
+        multiplayerState.reconnectAttempts =
+            0;
+
+
+        multiplayerState.lastConnectionAt =
+            now();
+
+
+        multiplayerState.connectionError =
+            null;
+
+
+        multiplayerLoading(
+            false
+        );
+
+
+        startHeartbeat();
+
+
+        await trackPresence();
+
+
+        await requestRoomSync();
+
+
+        await announceJoin(
+            options
+        );
+
+
+        multiplayerEvents.emit(
+            "connected",
+            getMultiplayerPublicState()
+        );
+
+
+        multiplayerEvents.emit(
+            "connectionStateChanged",
+            getMultiplayerPublicState()
+        );
+
+
+        multiplayerToast(
+            "به بازی آنلاین متصل شدی 🎮",
+            "🟢",
+            2500
+        );
+
+
+        return {
+            success: true,
+            roomId,
+            channelName
+        };
+
+
+    } catch (error) {
+
+        multiplayerLoading(
+            false
+        );
+
+
+        multiplayerState.connected =
+            false;
+
+
+        multiplayerState.connecting =
+            false;
+
+
+        multiplayerState.connectionStatus =
+            "error";
+
+
+        multiplayerState.connectionError =
+            error;
+
+
+        if (
+            multiplayerState.channel
+        ) {
+
+            try {
+
+                await client.removeChannel(
+                    multiplayerState.channel
+                );
+
+            } catch (removeError) {
+
+                console.error(
+                    "Remove channel error:",
+                    removeError
+                );
+
+            }
+
+        }
+
+
+        multiplayerState.channel =
+            null;
+
+
+        multiplayerEvents.emit(
+            "connectionError",
+            error
+        );
+
+
+        multiplayerEvents.emit(
+            "connectionStateChanged",
+            getMultiplayerPublicState()
+        );
+
+
+        console.error(
+            "Multiplayer connection error:",
+            error
+        );
+
+
+        scheduleReconnect();
+
+
+        return {
+            success: false,
+            error
+        };
+
+    }
+
+}
+
+
+/* ================================================================
+   13. CHANNEL LISTENERS
+================================================================ */
+
+function setupChannelListeners(
+    channel
+) {
+
+    if (!channel) {
+
+        return;
 
     }
 
 
-    /* =======================================================
-       PRESENCE SYNC
-    ======================================================== */
+    /*
+     * ------------------------------------------------------------
+     * BROADCAST
+     * ------------------------------------------------------------
+     */
 
-    function handlePresenceSync() {
+    channel.on(
+        "broadcast",
+        {
+            event: "multiplayer_message"
+        },
+        payload => {
 
-        const channel =
-            Multiplayer.channel;
+            handleIncomingMessage(
+                payload?.payload ||
+                payload
+            );
 
-
-        if (!channel) {
-            return;
         }
+    );
 
+
+    /*
+     * ------------------------------------------------------------
+     * PRESENCE SYNC
+     * ------------------------------------------------------------
+     */
+
+    channel.on(
+        "presence",
+        {
+            event: "sync"
+        },
+        () => {
+
+            updatePresenceState();
+
+        }
+    );
+
+
+    /*
+     * ------------------------------------------------------------
+     * PRESENCE JOIN
+     * ------------------------------------------------------------
+     */
+
+    channel.on(
+        "presence",
+        {
+            event: "join"
+        },
+        payload => {
+
+            handlePresenceJoin(
+                payload
+            );
+
+        }
+    );
+
+
+    /*
+     * ------------------------------------------------------------
+     * PRESENCE LEAVE
+     * ------------------------------------------------------------
+     */
+
+    channel.on(
+        "presence",
+        {
+            event: "leave"
+        },
+        payload => {
+
+            handlePresenceLeave(
+                payload
+            );
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   14. TRACK PRESENCE
+================================================================ */
+
+async function trackPresence() {
+
+    const channel =
+        multiplayerState.channel;
+
+
+    if (
+        !channel
+    ) {
+
+        return false;
+
+    }
+
+
+    const playerId =
+        getMultiplayerUserId() ||
+        generateId("guest");
+
+
+    multiplayerState.localPlayerId =
+        playerId;
+
+
+    multiplayerState.localPlayerName =
+        getMultiplayerPlayerName();
+
+
+    try {
+
+        await channel.track({
+
+            player_id:
+                playerId,
+
+            user_id:
+                playerId,
+
+            player_name:
+                multiplayerState.localPlayerName,
+
+            seat:
+                multiplayerState.localPlayerSeat,
+
+            online:
+                true,
+
+            ready:
+                !!multiplayerState.readyPlayers[playerId],
+
+            timestamp:
+                now()
+
+        });
+
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "Presence track error:",
+            error
+        );
+
+
+        return false;
+
+    }
+
+}
+
+
+/* ================================================================
+   15. UPDATE PRESENCE STATE
+================================================================ */
+
+function updatePresenceState() {
+
+    const channel =
+        multiplayerState.channel;
+
+
+    if (
+        !channel
+    ) {
+
+        return;
+
+    }
+
+
+    try {
 
         const state =
             channel.presenceState();
 
 
-        const players = [];
+        multiplayerState.presence =
+            state || {};
 
 
-        Object.keys(state)
-            .forEach(key => {
+        const players =
+            [];
+
+
+        Object.keys(
+            multiplayerState.presence
+        ).forEach(
+            key => {
 
                 const entries =
-                    state[key];
+                    multiplayerState.presence[key];
 
 
                 if (
-                    !entries ||
-                    !entries.length
+                    !Array.isArray(entries)
                 ) {
+
                     return;
+
                 }
 
 
-                const data =
-                    entries[
-                        entries.length - 1
-                    ];
+                entries.forEach(
+                    entry => {
+
+                        if (
+                            !entry
+                        ) {
+
+                            return;
+
+                        }
 
 
-                players.push({
+                        const playerId =
+                            entry.player_id ||
+                            entry.user_id ||
+                            key;
 
-                    id:
-                        data.id || key,
 
-                    name:
-                        data.name ||
-                        "بازیکن",
+                        players.push({
 
-                    avatar:
-                        data.avatar ||
-                        "👤",
+                            id:
+                                playerId,
 
-                    seat:
-                        Number(
-                            data.seat || 0
-                        ),
+                            userId:
+                                entry.user_id ||
+                                playerId,
 
-                    ready:
-                        true
+                            name:
+                                entry.player_name ||
+                                "بازیکن",
 
-                });
+                            seat:
+                                entry.seat ??
+                                null,
+
+                            online:
+                                entry.online !== false,
+
+                            ready:
+                                entry.ready === true,
+
+                            timestamp:
+                                entry.timestamp ||
+                                now()
+
+                        });
+
+                    }
+                );
+
+            }
+        );
+
+
+        multiplayerState.players =
+            normalizePlayers(
+                players
+            );
+
+
+        multiplayerState.playerMap =
+            createPlayerMap(
+                multiplayerState.players
+            );
+
+
+        multiplayerEvents.emit(
+            "playersUpdated",
+            cloneData(
+                multiplayerState.players
+            )
+        );
+
+
+        updateRoomUI();
+
+    } catch (error) {
+
+        console.error(
+            "Presence state error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* ================================================================
+   16. PRESENCE JOIN
+================================================================ */
+
+function handlePresenceJoin(
+    payload
+) {
+
+    updatePresenceState();
+
+
+    multiplayerEvents.emit(
+        "playerJoined",
+        payload
+    );
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   17. PRESENCE LEAVE
+================================================================ */
+
+function handlePresenceLeave(
+    payload
+) {
+
+    updatePresenceState();
+
+
+    multiplayerEvents.emit(
+        "playerLeft",
+        payload
+    );
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   18. NORMALIZE PLAYERS
+================================================================ */
+
+function normalizePlayers(
+    players
+) {
+
+    const map =
+        {};
+
+
+    players.forEach(
+        player => {
+
+            if (
+                !player?.id
+            ) {
+
+                return;
+
+            }
+
+
+            map[player.id] =
+                {
+
+                    ...map[player.id],
+
+                    ...player
+
+                };
+
+        }
+    );
+
+
+    return Object.values(
+        map
+    )
+        .sort(
+            (a, b) => {
+
+                if (
+                    a.seat !== null &&
+                    b.seat !== null
+                ) {
+
+                    return (
+                        Number(a.seat) -
+                        Number(b.seat)
+                    );
+
+                }
+
+
+                return String(a.name)
+                    .localeCompare(
+                        String(b.name),
+                        "fa"
+                    );
+
+            }
+        );
+
+}
+
+
+/* ================================================================
+   19. CREATE PLAYER MAP
+================================================================ */
+
+function createPlayerMap(
+    players
+) {
+
+    const map =
+        {};
+
+
+    players.forEach(
+        player => {
+
+            if (
+                player?.id
+            ) {
+
+                map[player.id] =
+                    player;
+
+            }
+
+        }
+    );
+
+
+    return map;
+
+}
+
+
+/* ================================================================
+   20. ANNOUNCE JOIN
+================================================================ */
+
+async function announceJoin(
+    options = {}
+) {
+
+    return sendMessage(
+        "player_joined",
+        {
+
+            player: {
+
+                id:
+                    getMultiplayerUserId(),
+
+                name:
+                    getMultiplayerPlayerName(),
+
+                seat:
+                    multiplayerState.localPlayerSeat
+
+            },
+
+            options:
+                cloneData(options)
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   21. SEND MESSAGE
+================================================================ */
+
+async function sendMessage(
+    type,
+    data = {},
+    options = {}
+) {
+
+    const channel =
+        multiplayerState.channel;
+
+
+    if (
+        !channel ||
+        !multiplayerState.connected
+    ) {
+
+        queueMessage(
+            type,
+            data,
+            options
+        );
+
+
+        return {
+
+            success: false,
+
+            queued: true,
+
+            error:
+                "NOT_CONNECTED"
+
+        };
+
+    }
+
+
+    const messageId =
+        generateId(
+            "msg"
+        );
+
+
+    const message = {
+
+        id:
+            messageId,
+
+        type:
+            safeString(type),
+
+        data:
+            cloneData(data),
+
+        sender: {
+
+            id:
+                getMultiplayerUserId(),
+
+            name:
+                getMultiplayerPlayerName(),
+
+            seat:
+                multiplayerState.localPlayerSeat
+
+        },
+
+        room_id:
+            multiplayerState.roomId,
+
+        timestamp:
+            now(),
+
+        sequence:
+            ++multiplayerState.sequence,
+
+        version:
+            MULTIPLAYER_CONFIG.version
+
+    };
+
+
+    try {
+
+        const result =
+            await channel.send({
+
+                type:
+                    "broadcast",
+
+                event:
+                    "multiplayer_message",
+
+                payload:
+                    message
 
             });
 
 
-        players.sort(
-            (a, b) =>
-                a.seat - b.seat
+        multiplayerState.lastMessageAt =
+            now();
+
+
+        if (
+            options.track !== false
+        ) {
+
+            multiplayerState.pendingMessages =
+                multiplayerState.pendingMessages.filter(
+                    item =>
+                        item.id !== messageId
+                );
+
+        }
+
+
+        multiplayerEvents.emit(
+            "messageSent",
+            message
         );
 
 
-        Multiplayer.players =
-            players;
+        return {
 
+            success:
+                true,
 
-        Multiplayer.roomState.players =
-            players;
+            messageId,
 
-
-        updateRoomUI();
-
-
-        checkRoomReady();
-
-    }
-
-
-    /* =======================================================
-       ROOM UPDATE
-    ======================================================== */
-
-    async function broadcastRoomUpdate(
-        data = {}
-    ) {
-
-        const channel =
-            Multiplayer.channel;
-
-
-        if (!channel) {
-            return false;
-        }
-
-
-        await channel.send({
-
-            type: "broadcast",
-
-            event: "room_update",
-
-            payload: {
-
-                sender:
-                    Multiplayer.playerId,
-
-                roomCode:
-                    Multiplayer.roomCode,
-
-                timestamp:
-                    Date.now(),
-
-                ...data
-
-            }
-
-        });
-
-
-        return true;
-
-    }
-
-
-    function handleRoomUpdate(
-        payload
-    ) {
-
-        if (!payload) {
-            return;
-        }
-
-
-        const data =
-            payload.payload ||
-            payload;
-
-
-        if (
-            data.sender ===
-            Multiplayer.playerId
-        ) {
-            return;
-        }
-
-
-        if (
-            Array.isArray(
-                data.players
-            )
-        ) {
-
-            Multiplayer.players =
-                data.players;
-
-            Multiplayer.roomState.players =
-                data.players;
-
-        }
-
-
-        if (
-            data.status
-        ) {
-
-            Multiplayer.roomState.status =
-                data.status;
-
-        }
-
-
-        updateRoomUI();
-
-        checkRoomReady();
-
-    }
-
-
-    /* =======================================================
-       ROOM READY CHECK
-    ======================================================== */
-
-    function checkRoomReady() {
-
-        const startButton =
-            document.getElementById(
-                "startGameButton"
-            );
-
-
-        const playerCount =
-            Multiplayer.players.length;
-
-
-        const ready =
-            playerCount === 4;
-
-
-        if (startButton) {
-
-            startButton.disabled =
-                !ready ||
-                !Multiplayer.isHost;
-
-        }
-
-
-        /*
-         * اگر ۴ بازیکن شدند،
-         * لابی آماده شروع است.
-         */
-
-        if (
-            ready &&
-            Multiplayer.isHost
-        ) {
-
-            showToast(
-                "هر ۴ بازیکن وارد شدند؛ بازی آماده شروع است",
-                "success"
-            );
-
-        }
-
-    }
-
-
-    /* =======================================================
-       START GAME
-    ======================================================== */
-
-    async function startGame() {
-
-        initialize();
-
-
-        if (
-            !Multiplayer.isHost
-        ) {
-
-            showToast(
-                "فقط میزبان می‌تواند بازی را شروع کند",
-                "error"
-            );
-
-            return false;
-
-        }
-
-
-        if (
-            Multiplayer.players.length !==
-            4
-        ) {
-
-            showToast(
-                "برای شروع باید ۴ بازیکن در اتاق باشند",
-                "error"
-            );
-
-            return false;
-
-        }
-
-
-        Multiplayer.roomState.status =
-            "playing";
-
-
-        const gamePayload = {
-
-            roomCode:
-                Multiplayer.roomCode,
-
-            players:
-                Multiplayer.players,
-
-            startedAt:
-                Date.now(),
-
-            hostId:
-                Multiplayer.playerId
+            result
 
         };
 
+    } catch (error) {
 
-        const client =
-            getSupabaseClient();
+        console.error(
+            "Send multiplayer message error:",
+            error
+        );
 
 
-        if (client) {
+        if (
+            options.queue !== false
+        ) {
 
-            try {
+            queueMessage(
+                type,
+                data,
+                options
+            );
 
-                await client
-                    .from("rooms")
-                    .update({
+        }
 
-                        status:
-                            "playing"
 
-                    })
-                    .eq(
-                        "room_code",
-                        Multiplayer.roomCode
-                    );
+        return {
 
-            } catch (err) {
+            success:
+                false,
 
-                warn(
-                    "Could not update room status",
-                    err
-                );
+            error
+
+        };
+
+    }
+
+}
+
+
+/* ================================================================
+   22. HANDLE INCOMING MESSAGE
+================================================================ */
+
+function handleIncomingMessage(
+    message
+) {
+
+    if (
+        !message
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !message.id
+    ) {
+
+        message.id =
+            generateId(
+                "remote"
+            );
+
+    }
+
+
+    /*
+     * Ignore messages from another room.
+     */
+
+    if (
+        message.room_id &&
+        multiplayerState.roomId &&
+        message.room_id !== multiplayerState.roomId
+    ) {
+
+        return;
+
+    }
+
+
+    /*
+     * Ignore own duplicate message.
+     */
+
+    const localId =
+        getMultiplayerUserId();
+
+
+    if (
+        message.sender?.id === localId
+    ) {
+
+        return;
+
+    }
+
+
+    /*
+     * Prevent duplicate processing.
+     */
+
+    if (
+        multiplayerState.receivedActions[message.id]
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.receivedActions[
+        message.id
+    ] =
+        now();
+
+
+    multiplayerState.lastMessageAt =
+        now();
+
+
+    multiplayerEvents.emit(
+        "messageReceived",
+        message
+    );
+
+
+    routeIncomingMessage(
+        message
+    );
+
+
+    cleanupReceivedMessages();
+
+}
+
+
+/* ================================================================
+   23. ROUTE INCOMING MESSAGE
+================================================================ */
+
+function routeIncomingMessage(
+    message
+) {
+
+    const type =
+        message.type;
+
+
+    switch (
+        type
+    ) {
+
+        case "player_joined":
+
+            handleRemotePlayerJoined(
+                message
+            );
+
+            break;
+
+
+        case "player_left":
+
+            handleRemotePlayerLeft(
+                message
+            );
+
+            break;
+
+
+        case "room_sync_request":
+
+            handleRoomSyncRequest(
+                message
+            );
+
+            break;
+
+
+        case "room_sync":
+
+            handleRoomSync(
+                message
+            );
+
+            break;
+
+
+        case "player_ready":
+
+            handlePlayerReady(
+                message
+            );
+
+            break;
+
+
+        case "player_unready":
+
+            handlePlayerUnready(
+                message
+            );
+
+            break;
+
+
+        case "game_start":
+
+            handleGameStart(
+                message
+            );
+
+            break;
+
+
+        case "game_state":
+
+            handleGameState(
+                message
+            );
+
+            break;
+
+
+        case "game_action":
+
+            handleGameAction(
+                message
+            );
+
+            break;
+
+
+        case "turn_changed":
+
+            handleTurnChanged(
+                message
+            );
+
+            break;
+
+
+        case "game_finished":
+
+            handleGameFinished(
+                message
+            );
+
+            break;
+
+
+        case "chat_message":
+
+            handleChatMessage(
+                message
+            );
+
+            break;
+
+
+        case "host_changed":
+
+            handleHostChanged(
+                message
+            );
+
+            break;
+
+
+        case "heartbeat":
+
+            handleHeartbeat(
+                message
+            );
+
+            break;
+
+
+        case "ping":
+
+            sendMessage(
+                "pong",
+                {
+
+                    pingId:
+                        message.data?.pingId
+
+                },
+                {
+                    queue: false
+                }
+            );
+
+            break;
+
+
+        case "pong":
+
+            multiplayerEvents.emit(
+                "pong",
+                message
+            );
+
+            break;
+
+
+        default:
+
+            multiplayerEvents.emit(
+                "unknownMessage",
+                message
+            );
+
+            break;
+
+    }
+
+}
+
+
+/* ================================================================
+   24. REMOTE PLAYER JOINED
+================================================================ */
+
+function handleRemotePlayerJoined(
+    message
+) {
+
+    multiplayerEvents.emit(
+        "remotePlayerJoined",
+        message.data
+    );
+
+
+    updatePresenceState();
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   25. REMOTE PLAYER LEFT
+================================================================ */
+
+function handleRemotePlayerLeft(
+    message
+) {
+
+    const playerId =
+        message.data?.player?.id;
+
+
+    if (
+        playerId
+    ) {
+
+        delete multiplayerState.playerMap[
+            playerId
+        ];
+
+    }
+
+
+    multiplayerEvents.emit(
+        "remotePlayerLeft",
+        message.data
+    );
+
+
+    updatePresenceState();
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   26. QUEUE MESSAGE
+================================================================ */
+
+function queueMessage(
+    type,
+    data,
+    options = {}
+) {
+
+    if (
+        multiplayerState.pendingMessages.length >=
+        MULTIPLAYER_CONFIG.maxPendingMessages
+    ) {
+
+        multiplayerState.pendingMessages.shift();
+
+    }
+
+
+    multiplayerState.pendingMessages.push({
+
+        id:
+            generateId("queued"),
+
+        type,
+
+        data:
+            cloneData(data),
+
+        options:
+            cloneData(options),
+
+        createdAt:
+            now()
+
+    });
+
+
+}
+
+
+/* ================================================================
+   27. FLUSH MESSAGE QUEUE
+================================================================ */
+
+async function flushMessageQueue() {
+
+    if (
+        !multiplayerState.connected
+    ) {
+
+        return;
+
+    }
+
+
+    const queue =
+        multiplayerState.pendingMessages.slice();
+
+
+    multiplayerState.pendingMessages =
+        [];
+
+
+    for (
+        const item of queue
+    ) {
+
+        try {
+
+            await sendMessage(
+                item.type,
+                item.data,
+                {
+                    ...(item.options || {}),
+                    queue: false
+                }
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Queued message error:",
+                error
+            );
+
+        }
+
+    }
+
+}
+
+
+/* ================================================================
+   28. REQUEST ROOM SYNC
+================================================================ */
+
+async function requestRoomSync() {
+
+    return sendMessage(
+        "room_sync_request",
+        {
+
+            requester: {
+
+                id:
+                    getMultiplayerUserId(),
+
+                name:
+                    getMultiplayerPlayerName()
 
             }
 
         }
+    );
+
+}
 
 
-        await broadcastGameStart(
-            gamePayload
-        );
+/* ================================================================
+   29. HANDLE ROOM SYNC REQUEST
+================================================================ */
 
+function handleRoomSyncRequest(
+    message
+) {
 
-        handleGameStart({
-            payload:
-                gamePayload
-        });
+    if (
+        !isCurrentHost()
+    ) {
 
-
-        return true;
+        return;
 
     }
 
 
-    /* =======================================================
-       BROADCAST GAME START
-    ======================================================== */
+    sendRoomSync(
+        message.sender?.id
+    );
 
-    async function broadcastGameStart(
-        data
-    ) {
-
-        const channel =
-            Multiplayer.channel;
+}
 
 
-        if (!channel) {
-            return false;
+/* ================================================================
+   30. SEND ROOM SYNC
+================================================================ */
+
+async function sendRoomSync(
+    targetPlayerId = null
+) {
+
+    return sendMessage(
+        "room_sync",
+        {
+
+            targetPlayerId,
+
+            roomId:
+                multiplayerState.roomId,
+
+            players:
+                cloneData(
+                    multiplayerState.players
+                ),
+
+            readyPlayers:
+                cloneData(
+                    multiplayerState.readyPlayers
+                ),
+
+            gameStarted:
+                multiplayerState.gameStarted,
+
+            gameFinished:
+                multiplayerState.gameFinished,
+
+            currentTurn:
+                multiplayerState.currentTurn,
+
+            gameStateVersion:
+                multiplayerState.gameStateVersion,
+
+            gameState:
+                cloneData(
+                    multiplayerState.lastGameState
+                ),
+
+            hostId:
+                multiplayerState.hostId
+
         }
+    );
+
+}
 
 
-        await channel.send({
+/* ================================================================
+   31. HANDLE ROOM SYNC
+================================================================ */
 
-            type: "broadcast",
+function handleRoomSync(
+    message
+) {
 
-            event: "game_start",
-
-            payload: data
-
-        });
+    const data =
+        message.data;
 
 
-        return true;
+    if (
+        data?.targetPlayerId &&
+        data.targetPlayerId !== getMultiplayerUserId()
+    ) {
+
+        return;
 
     }
 
 
-    /* =======================================================
-       HANDLE GAME START
-    ======================================================== */
-
-    function handleGameStart(
-        payload
+    if (
+        Array.isArray(data?.players)
     ) {
 
-        const data =
-            payload.payload ||
-            payload;
-
-
-        Multiplayer.roomState.status =
-            "playing";
-
-
-        if (
-            Array.isArray(
+        multiplayerState.players =
+            normalizePlayers(
                 data.players
-            )
-        ) {
-
-            Multiplayer.players =
-                data.players;
-
-        }
-
-
-        log(
-            "Game started",
-            data
-        );
-
-
-        /*
-         * اگر game.js تابع شروع بازی داشته باشد،
-         * آن را صدا می‌زنیم.
-         */
-
-        if (
-            window.Game &&
-            typeof window.Game.startOnlineGame ===
-            "function"
-        ) {
-
-            window.Game.startOnlineGame(
-                data
             );
 
-            return;
+
+        multiplayerState.playerMap =
+            createPlayerMap(
+                multiplayerState.players
+            );
+
+    }
+
+
+    if (
+        isObject(data?.readyPlayers)
+    ) {
+
+        multiplayerState.readyPlayers =
+            {
+                ...data.readyPlayers
+            };
+
+    }
+
+
+    multiplayerState.gameStarted =
+        !!data?.gameStarted;
+
+
+    multiplayerState.gameFinished =
+        !!data?.gameFinished;
+
+
+    multiplayerState.currentTurn =
+        data?.currentTurn ??
+        null;
+
+
+    multiplayerState.gameStateVersion =
+        safeNumber(
+            data?.gameStateVersion,
+            multiplayerState.gameStateVersion
+        );
+
+
+    multiplayerState.hostId =
+        data?.hostId ||
+        multiplayerState.hostId;
+
+
+    if (
+        data?.gameState
+    ) {
+
+        applyRemoteGameState(
+            data.gameState,
+            {
+                fromSync: true
+            }
+        );
+
+    }
+
+
+    multiplayerEvents.emit(
+        "roomSynced",
+        cloneData(data)
+    );
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   32. SET READY
+================================================================ */
+
+async function setPlayerReady(
+    ready = true
+) {
+
+    const playerId =
+        getMultiplayerUserId();
+
+
+    if (
+        !playerId
+    ) {
+
+        return {
+            success: false,
+            error: "PLAYER_NOT_FOUND"
+        };
+
+    }
+
+
+    multiplayerState.readyPlayers[
+        playerId
+    ] =
+        !!ready;
+
+
+    await trackPresence();
+
+
+    const result =
+        await sendMessage(
+            ready
+                ? "player_ready"
+                : "player_unready",
+            {
+
+                playerId,
+
+                playerName:
+                    getMultiplayerPlayerName(),
+
+                seat:
+                    multiplayerState.localPlayerSeat,
+
+                ready:
+                    !!ready
+
+            }
+        );
+
+
+    multiplayerEvents.emit(
+        ready
+            ? "playerReady"
+            : "playerUnready",
+        {
+
+            playerId,
+
+            ready:
+                !!ready
 
         }
+    );
 
 
-        if (
-            typeof window.startOnlineGame ===
-            "function"
-        ) {
+    updateRoomUI();
+
+
+    return result;
+
+}
+
+
+/* ================================================================
+   33. HANDLE PLAYER READY
+================================================================ */
+
+function handlePlayerReady(
+    message
+) {
+
+    const playerId =
+        message.data?.playerId;
+
+
+    if (
+        !playerId
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.readyPlayers[
+        playerId
+    ] =
+        true;
+
+
+    updatePresenceState();
+
+
+    multiplayerEvents.emit(
+        "playerReady",
+        message.data
+    );
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   34. HANDLE PLAYER UNREADY
+================================================================ */
+
+function handlePlayerUnready(
+    message
+) {
+
+    const playerId =
+        message.data?.playerId;
+
+
+    if (
+        !playerId
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.readyPlayers[
+        playerId
+    ] =
+        false;
+
+
+    updatePresenceState();
+
+
+    multiplayerEvents.emit(
+        "playerUnready",
+        message.data
+    );
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   35. CHECK ALL PLAYERS READY
+================================================================ */
+
+function areAllPlayersReady() {
+
+    const players =
+        multiplayerState.players;
+
+
+    if (
+        players.length !==
+        MULTIPLAYER_CONFIG.maxPlayersPerRoom
+    ) {
+
+        return false;
+
+    }
+
+
+    return players.every(
+        player =>
+            multiplayerState.readyPlayers[
+                player.id
+            ] === true
+    );
+
+}
+
+
+/* ================================================================
+   36. START GAME
+================================================================ */
+
+async function startMultiplayerGame(
+    initialGameState = null
+) {
+
+    if (
+        !isCurrentHost()
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "ONLY_HOST_CAN_START"
+
+        };
+
+    }
+
+
+    if (
+        multiplayerState.gameStarted
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "GAME_ALREADY_STARTED"
+
+        };
+
+    }
+
+
+    if (
+        multiplayerState.players.length < 2
+    ) {
+
+        multiplayerToast(
+            "برای شروع بازی حداقل دو بازیکن لازم است.",
+            "⚠️"
+        );
+
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "NOT_ENOUGH_PLAYERS"
+
+        };
+
+    }
+
+
+    multiplayerState.gameStarted =
+        true;
+
+
+    multiplayerState.gameFinished =
+        false;
+
+
+    multiplayerState.gameStateVersion =
+        1;
+
+
+    multiplayerState.currentTurn =
+        null;
+
+
+    if (
+        initialGameState
+    ) {
+
+        multiplayerState.lastGameState =
+            cloneData(
+                initialGameState
+            );
+
+    }
+
+
+    const result =
+        await sendMessage(
+            "game_start",
+            {
+
+                players:
+                    cloneData(
+                        multiplayerState.players
+                    ),
+
+                gameState:
+                    cloneData(
+                        multiplayerState.lastGameState
+                    ),
+
+                version:
+                    multiplayerState.gameStateVersion
+
+            }
+        );
+
+
+    multiplayerEvents.emit(
+        "gameStarted",
+        {
+
+            players:
+                cloneData(
+                    multiplayerState.players
+                ),
+
+            gameState:
+                cloneData(
+                    multiplayerState.lastGameState
+                )
+
+        }
+    );
+
+
+    return result;
+
+}
+
+
+/* ================================================================
+   37. HANDLE GAME START
+================================================================ */
+
+function handleGameStart(
+    message
+) {
+
+    const data =
+        message.data;
+
+
+    multiplayerState.gameStarted =
+        true;
+
+
+    multiplayerState.gameFinished =
+        false;
+
+
+    multiplayerState.gameStateVersion =
+        safeNumber(
+            data?.version,
+            1
+        );
+
+
+    if (
+        data?.gameState
+    ) {
+
+        applyRemoteGameState(
+            data.gameState,
+            {
+                fromStart: true
+            }
+        );
+
+    }
+
+
+    multiplayerEvents.emit(
+        "gameStarted",
+        cloneData(data)
+    );
+
+
+    /*
+     * اگر game.js تابع شروع آنلاین داشته باشد.
+     */
+
+    if (
+        typeof window.startOnlineGame === "function"
+    ) {
+
+        try {
 
             window.startOnlineGame(
-                data
+                cloneData(data)
             );
 
-            return;
+        } catch (error) {
+
+            console.error(
+                "startOnlineGame error:",
+                error
+            );
 
         }
-
-
-        /*
-         * اگر game.js هنوز این تابع را ندارد،
-         * فعلاً صفحه بازی نمایش داده می‌شود.
-         */
-
-        showScreen(
-            "gameScreen"
-        );
-
-
-        showToast(
-            "بازی شروع شد",
-            "success"
-        );
 
     }
 
 
-    /* =======================================================
-       CURRENT SEAT
-    ======================================================== */
+    updateGameUI();
 
-    function getCurrentSeat() {
+}
 
-        const player =
-            Multiplayer.players.find(
+
+/* ================================================================
+   38. SEND GAME ACTION
+================================================================ */
+
+async function sendGameAction(
+    actionType,
+    actionData = {},
+    options = {}
+) {
+
+    if (
+        !multiplayerState.connected
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "NOT_CONNECTED"
+
+        };
+
+    }
+
+
+    if (
+        !multiplayerState.gameStarted
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "GAME_NOT_STARTED"
+
+        };
+
+    }
+
+
+    const actionId =
+        generateId(
+            "action"
+        );
+
+
+    const action = {
+
+        actionId,
+
+        actionType:
+            safeString(
+                actionType
+            ),
+
+        data:
+            cloneData(
+                actionData
+            ),
+
+        playerId:
+            getMultiplayerUserId(),
+
+        playerName:
+            getMultiplayerPlayerName(),
+
+        seat:
+            multiplayerState.localPlayerSeat,
+
+        turn:
+            multiplayerState.currentTurn,
+
+        stateVersion:
+            multiplayerState.gameStateVersion,
+
+        timestamp:
+            now()
+
+    };
+
+
+    /*
+     * جلوگیری از ارسال مجدد همان action.
+     */
+
+    multiplayerState.sentActions[
+        actionId
+    ] =
+        true;
+
+
+    multiplayerState.lastActionId =
+        actionId;
+
+
+    multiplayerState.pendingActions.push(
+        action
+    );
+
+
+    const result =
+        await sendMessage(
+            "game_action",
+            action,
+            options
+        );
+
+
+    if (
+        !result.success
+    ) {
+
+        multiplayerState.pendingActions =
+            multiplayerState.pendingActions.filter(
                 item =>
-                    item.id ===
-                    Multiplayer.playerId
+                    item.actionId !== actionId
             );
-
-
-        if (player) {
-            return Number(
-                player.seat
-            );
-        }
-
-
-        return 0;
 
     }
 
 
-    /* =======================================================
-       LEAVE ROOM
-    ======================================================== */
+    return {
 
-    async function leaveRoom() {
+        ...result,
 
-        const client =
-            getSupabaseClient();
+        action
 
+    };
+
+}
+
+
+/* ================================================================
+   39. HANDLE GAME ACTION
+================================================================ */
+
+function handleGameAction(
+    message
+) {
+
+    const action =
+        message.data;
+
+
+    if (
+        !action
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !action.actionId
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        multiplayerState.receivedActions[
+            action.actionId
+        ]
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.receivedActions[
+        action.actionId
+    ] =
+        now();
+
+
+    /*
+     * Remove from pending local actions
+     * when the server/other players confirm it.
+     */
+
+    multiplayerState.pendingActions =
+        multiplayerState.pendingActions.filter(
+            item =>
+                item.actionId !==
+                action.actionId
+        );
+
+
+    /*
+     * Ignore invalid room.
+     */
+
+    if (
+        action.roomId &&
+        action.roomId !==
+            multiplayerState.roomId
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerEvents.emit(
+        "gameAction",
+        cloneData(action)
+    );
+
+
+    /*
+     * اتصال با game.js
+     */
+
+    if (
+        typeof window.handleOnlineGameAction === "function"
+    ) {
 
         try {
 
-            if (
-                Multiplayer.channel &&
-                client
-            ) {
+            window.handleOnlineGameAction(
+                cloneData(action)
+            );
 
-                try {
+        } catch (error) {
 
-                    await Multiplayer.channel
-                        .untrack();
-
-                } catch (e) {
-
-                    warn(
-                        "Untrack failed",
-                        e
-                    );
-
-                }
-
-
-                await client
-                    .removeChannel(
-                        Multiplayer.channel
-                    );
-
-            }
-
-
-            if (
-                client &&
-                Multiplayer.roomCode
-            ) {
-
-                await client
-                    .from("room_players")
-                    .delete()
-                    .eq(
-                        "room_code",
-                        Multiplayer.roomCode
-                    )
-                    .eq(
-                        "player_id",
-                        Multiplayer.playerId
-                    );
-
-            }
-
-
-        } catch (err) {
-
-            warn(
-                "Leave room error:",
-                err
+            console.error(
+                "handleOnlineGameAction error:",
+                error
             );
 
         }
 
+    }
 
-        Multiplayer.channel =
-            null;
 
-        Multiplayer.connected =
-            false;
+    /*
+     * برخی پروژه‌ها از applyRemoteMove استفاده می‌کنند.
+     */
 
-        Multiplayer.roomCode =
-            null;
+    if (
+        typeof window.applyRemoteMove === "function"
+    ) {
 
-        Multiplayer.roomName =
-            "";
+        try {
 
-        Multiplayer.isHost =
-            false;
+            window.applyRemoteMove(
+                cloneData(action)
+            );
 
-        Multiplayer.players =
-            [];
+        } catch (error) {
 
-        Multiplayer.roomState = {
+            console.error(
+                "applyRemoteMove error:",
+                error
+            );
 
-            status: "waiting",
+        }
 
-            hostId: null,
+    }
 
-            players: []
+}
+
+
+/* ================================================================
+   40. SEND GAME STATE
+================================================================ */
+
+async function sendGameState(
+    gameState,
+    options = {}
+) {
+
+    if (
+        !multiplayerState.connected
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "NOT_CONNECTED"
 
         };
 
-
-        updateRoomUI();
-
-
-        showScreen(
-            "homeScreen"
-        );
-
-
-        showToast(
-            "از اتاق خارج شدی",
-            "info"
-        );
-
     }
 
 
-    /* =======================================================
-       COPY ROOM CODE
-    ======================================================== */
-
-    async function copyRoomCode() {
-
-        if (
-            !Multiplayer.roomCode
-        ) {
-
-            return;
-
-        }
-
-
-        try {
-
-            await navigator
-                .clipboard
-                .writeText(
-                    Multiplayer.roomCode
-                );
-
-
-            showToast(
-                "کد اتاق کپی شد",
-                "success"
-            );
-
-        } catch (err) {
-
-            warn(
-                "Clipboard error",
-                err
-            );
-
-
-            showToast(
-                Multiplayer.roomCode
-            );
-
-        }
-
-    }
-
-
-    /* =======================================================
-       UPDATE ROOM UI
-    ======================================================== */
-
-    function updateRoomUI() {
-
-        const codeElement =
-            document.getElementById(
-                "currentRoomCode"
-            );
-
-
-        if (codeElement) {
-
-            codeElement.textContent =
-                Multiplayer.roomCode ||
-                "------";
-
-        }
-
-
-        const players =
-            Multiplayer.players || [];
-
-
-        for (
-            let index = 0;
-            index < 4;
-            index++
-        ) {
-
-            const player =
-                players.find(
-                    item =>
-                        Number(
-                            item.seat
-                        ) === index
-                ) ||
-                players[index];
-
-
-            updateRoomPlayer(
-                index + 1,
-                player
-            );
-
-        }
-
-
-        checkRoomReady();
-
-    }
-
-
-    /* =======================================================
-       UPDATE ONE PLAYER SLOT
-    ======================================================== */
-
-    function updateRoomPlayer(
-        slotNumber,
-        player
+    if (
+        !isCurrentHost() &&
+        options.allowNonHost !== true
     ) {
 
-        const element =
-            document.getElementById(
-                `roomPlayer${slotNumber}`
-            );
+        return {
 
+            success:
+                false,
 
-        if (!element) {
-            return;
-        }
-
-
-        const avatar =
-            element.querySelector(
-                ".room-player-avatar"
-            );
-
-
-        const info =
-            element.querySelector(
-                ".room-player-info"
-            );
-
-
-        if (!player) {
-
-            element.classList.add(
-                "empty-player"
-            );
-
-
-            if (avatar) {
-
-                avatar.textContent =
-                    "+";
-
-            }
-
-
-            if (info) {
-
-                const strong =
-                    info.querySelector(
-                        "strong"
-                    );
-
-                const span =
-                    info.querySelector(
-                        "span"
-                    );
-
-
-                if (strong) {
-
-                    strong.textContent =
-                        "جای خالی";
-
-                }
-
-
-                if (span) {
-
-                    span.textContent =
-                        "منتظر بازیکن";
-
-                }
-
-            }
-
-
-            return;
-
-        }
-
-
-        element.classList.remove(
-            "empty-player"
-        );
-
-
-        if (avatar) {
-
-            avatar.textContent =
-                player.avatar ||
-                "👤";
-
-        }
-
-
-        if (info) {
-
-            const strong =
-                info.querySelector(
-                    "strong"
-                );
-
-            const span =
-                info.querySelector(
-                    "span"
-                );
-
-
-            if (strong) {
-
-                strong.textContent =
-                    player.name ||
-                    "بازیکن";
-
-            }
-
-
-            if (span) {
-
-                if (
-                    player.id ===
-                    Multiplayer.roomState.hostId
-                ) {
-
-                    span.textContent =
-                        "👑 میزبان";
-
-                } else {
-
-                    span.textContent =
-                        "آماده بازی";
-
-                }
-
-            }
-
-        }
-
-    }
-
-
-    /* =======================================================
-       SCREEN NAVIGATION
-    ======================================================== */
-
-    function showScreen(
-        screenId
-    ) {
-
-        const screens =
-            document.querySelectorAll(
-                ".screen"
-            );
-
-
-        screens.forEach(
-            screen => {
-
-                screen.classList.remove(
-                    "active-screen"
-                );
-
-            }
-        );
-
-
-        const target =
-            document.getElementById(
-                screenId
-            );
-
-
-        if (target) {
-
-            target.classList.add(
-                "active-screen"
-            );
-
-        }
-
-
-        const navItems =
-            document.querySelectorAll(
-                ".nav-item"
-            );
-
-
-        navItems.forEach(
-            item => {
-
-                item.classList.toggle(
-                    "active",
-                    item.dataset.screen ===
-                    screenId
-                );
-
-            }
-        );
-
-    }
-
-
-    /* =======================================================
-       LOCAL ROOM STORAGE
-    ======================================================== */
-
-    function saveLocalRoom() {
-
-        if (
-            !Multiplayer.roomCode
-        ) {
-            return;
-        }
-
-
-        const room = {
-
-            roomCode:
-                Multiplayer.roomCode,
-
-            name:
-                Multiplayer.roomName,
-
-            hostId:
-                Multiplayer.roomState.hostId ||
-                Multiplayer.playerId,
-
-            status:
-                Multiplayer.roomState.status,
-
-            players:
-                Multiplayer.players
+            error:
+                "ONLY_HOST_CAN_SYNC"
 
         };
 
+    }
 
-        localStorage.setItem(
-            "hokm_room",
-            JSON.stringify(room)
+
+    const clonedState =
+        cloneData(
+            gameState
+        );
+
+
+    if (
+        clonedState === null
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "INVALID_GAME_STATE"
+
+        };
+
+    }
+
+
+    try {
+
+        const size =
+            JSON.stringify(
+                clonedState
+            ).length;
+
+
+        if (
+            size >
+            MULTIPLAYER_CONFIG.maxStateSize
+        ) {
+
+            return {
+
+                success:
+                    false,
+
+                error:
+                    "GAME_STATE_TOO_LARGE"
+
+            };
+
+        }
+
+    } catch (error) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "GAME_STATE_SERIALIZATION_FAILED"
+
+        };
+
+    }
+
+
+    multiplayerState.gameStateVersion++;
+
+
+    multiplayerState.lastGameState =
+        clonedState;
+
+
+    const result =
+        await sendMessage(
+            "game_state",
+            {
+
+                state:
+                    clonedState,
+
+                version:
+                    multiplayerState.gameStateVersion,
+
+                updatedBy:
+                    getMultiplayerUserId(),
+
+                timestamp:
+                    now()
+
+            },
+            options
+        );
+
+
+    multiplayerEvents.emit(
+        "gameStateSent",
+        {
+
+            state:
+                clonedState,
+
+            version:
+                multiplayerState.gameStateVersion
+
+        }
+    );
+
+
+    return result;
+
+}
+
+
+/* ================================================================
+   41. HANDLE GAME STATE
+================================================================ */
+
+function handleGameState(
+    message
+) {
+
+    const data =
+        message.data;
+
+
+    if (
+        !data?.state
+    ) {
+
+        return;
+
+    }
+
+
+    const version =
+        safeNumber(
+            data.version,
+            0
+        );
+
+
+    /*
+     * Ignore old states.
+     */
+
+    if (
+        version <
+        multiplayerState.gameStateVersion
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.gameStateVersion =
+        version;
+
+
+    applyRemoteGameState(
+        data.state,
+        {
+
+            version,
+
+            sender:
+                message.sender
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   42. APPLY REMOTE GAME STATE
+================================================================ */
+
+function applyRemoteGameState(
+    state,
+    metadata = {}
+) {
+
+    const clonedState =
+        cloneData(
+            state
+        );
+
+
+    if (
+        clonedState === null
+    ) {
+
+        return false;
+
+    }
+
+
+    multiplayerState.lastGameState =
+        clonedState;
+
+
+    if (
+        metadata.version !== undefined
+    ) {
+
+        multiplayerState.gameStateVersion =
+            safeNumber(
+                metadata.version,
+                multiplayerState.gameStateVersion
+            );
+
+    }
+
+
+    multiplayerEvents.emit(
+        "gameStateUpdated",
+        {
+
+            state:
+                cloneData(
+                    clonedState
+                ),
+
+            metadata:
+                cloneData(
+                    metadata
+                )
+
+        }
+    );
+
+
+    /*
+     * اتصال مستقیم به game.js
+     */
+
+    if (
+        typeof window.applyRemoteGameState === "function"
+    ) {
+
+        try {
+
+            window.applyRemoteGameState(
+                cloneData(
+                    clonedState
+                ),
+                cloneData(
+                    metadata
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "applyRemoteGameState error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    if (
+        typeof window.syncGameFromServer === "function"
+    ) {
+
+        try {
+
+            window.syncGameFromServer(
+                cloneData(
+                    clonedState
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "syncGameFromServer error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    updateGameUI();
+
+
+    return true;
+
+}
+
+
+/* ================================================================
+   43. SET CURRENT TURN
+================================================================ */
+
+async function setCurrentTurn(
+    playerId
+) {
+
+    if (
+        !isCurrentHost()
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "ONLY_HOST_CAN_CHANGE_TURN"
+
+        };
+
+    }
+
+
+    multiplayerState.currentTurn =
+        playerId || null;
+
+
+    const result =
+        await sendMessage(
+            "turn_changed",
+            {
+
+                playerId:
+                    multiplayerState.currentTurn,
+
+                timestamp:
+                    now()
+
+            }
+        );
+
+
+    multiplayerEvents.emit(
+        "turnChanged",
+        {
+
+            playerId:
+                multiplayerState.currentTurn
+
+        }
+    );
+
+
+    updateGameUI();
+
+
+    return result;
+
+}
+
+
+/* ================================================================
+   44. HANDLE TURN CHANGED
+================================================================ */
+
+function handleTurnChanged(
+    message
+) {
+
+    const playerId =
+        message.data?.playerId;
+
+
+    multiplayerState.currentTurn =
+        playerId || null;
+
+
+    multiplayerEvents.emit(
+        "turnChanged",
+        {
+
+            playerId:
+                multiplayerState.currentTurn
+
+        }
+    );
+
+
+    /*
+     * اتصال با game.js
+     */
+
+    if (
+        typeof window.setOnlineTurn === "function"
+    ) {
+
+        try {
+
+            window.setOnlineTurn(
+                multiplayerState.currentTurn
+            );
+
+        } catch (error) {
+
+            console.error(
+                "setOnlineTurn error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    updateGameUI();
+
+}
+
+
+/* ================================================================
+   45. FINISH GAME
+================================================================ */
+
+async function finishMultiplayerGame(
+    resultData = {}
+) {
+
+    multiplayerState.gameFinished =
+        true;
+
+
+    multiplayerState.gameStarted =
+        false;
+
+
+    const result =
+        await sendMessage(
+            "game_finished",
+            {
+
+                result:
+                    cloneData(
+                        resultData
+                    ),
+
+                finishedAt:
+                    now()
+
+            }
+        );
+
+
+    multiplayerEvents.emit(
+        "gameFinished",
+        cloneData(
+            resultData
+        )
+    );
+
+
+    return result;
+
+}
+
+
+/* ================================================================
+   46. HANDLE GAME FINISHED
+================================================================ */
+
+function handleGameFinished(
+    message
+) {
+
+    multiplayerState.gameFinished =
+        true;
+
+
+    multiplayerState.gameStarted =
+        false;
+
+
+    const result =
+        message.data?.result ||
+        message.data;
+
+
+    multiplayerEvents.emit(
+        "gameFinished",
+        cloneData(
+            result
+        )
+    );
+
+
+    if (
+        typeof window.handleOnlineGameFinished === "function"
+    ) {
+
+        try {
+
+            window.handleOnlineGameFinished(
+                cloneData(
+                    result
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "handleOnlineGameFinished error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    updateGameUI();
+
+}
+
+
+/* ================================================================
+   47. SEND CHAT MESSAGE
+================================================================ */
+
+async function sendMultiplayerChatMessage(
+    text,
+    metadata = {}
+) {
+
+    text =
+        safeString(
+            text
+        ).trim();
+
+
+    if (
+        !text
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "EMPTY_MESSAGE"
+
+        };
+
+    }
+
+
+    if (
+        text.length >
+        500
+    ) {
+
+        text =
+            text.substring(
+                0,
+                500
+            );
+
+    }
+
+
+    const messageData = {
+
+        id:
+            generateId(
+                "chat"
+            ),
+
+        text,
+
+        playerId:
+            getMultiplayerUserId(),
+
+        playerName:
+            getMultiplayerPlayerName(),
+
+        timestamp:
+            now(),
+
+        metadata:
+            cloneData(
+                metadata
+            )
+
+    };
+
+
+    return sendMessage(
+        "chat_message",
+        messageData
+    );
+
+}
+
+
+/* ================================================================
+   48. HANDLE CHAT MESSAGE
+================================================================ */
+
+function handleChatMessage(
+    message
+) {
+
+    const chat =
+        message.data;
+
+
+    if (
+        !chat
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerEvents.emit(
+        "chatMessage",
+        cloneData(
+            chat
+        )
+    );
+
+
+    /*
+     * اتصال با chat.js
+     */
+
+    if (
+        typeof window.receiveOnlineChatMessage === "function"
+    ) {
+
+        try {
+
+            window.receiveOnlineChatMessage(
+                cloneData(
+                    chat
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "receiveOnlineChatMessage error:",
+                error
+            );
+
+        }
+
+    }
+
+}
+
+
+/* ================================================================
+   49. HOST DETECTION
+================================================================ */
+
+function calculateHost() {
+
+    const players =
+        multiplayerState.players;
+
+
+    if (
+        players.length === 0
+    ) {
+
+        return null;
+
+    }
+
+
+    /*
+     * اولویت با بازیکنی است که seat صفر دارد.
+     */
+
+    const seatZero =
+        players.find(
+            player =>
+                Number(player.seat) === 0
+        );
+
+
+    if (
+        seatZero
+    ) {
+
+        return seatZero.id;
+
+    }
+
+
+    /*
+     * در غیر این صورت اولین بازیکن
+     * بر اساس شناسه.
+     */
+
+    const sorted =
+        players
+            .slice()
+            .sort(
+                (a, b) =>
+                    String(a.id)
+                        .localeCompare(
+                            String(b.id)
+                        )
+            );
+
+
+    return sorted[0]?.id || null;
+
+}
+
+
+/* ================================================================
+   50. IS CURRENT HOST
+================================================================ */
+
+function isCurrentHost() {
+
+    const currentUserId =
+        getMultiplayerUserId();
+
+
+    if (
+        multiplayerState.hostId
+    ) {
+
+        return (
+            multiplayerState.hostId ===
+            currentUserId
         );
 
     }
 
 
-    function loadLocalRoom(
-        roomCode
+    const calculatedHost =
+        calculateHost();
+
+
+    multiplayerState.hostId =
+        calculatedHost;
+
+
+    multiplayerState.isHost =
+        calculatedHost ===
+        currentUserId;
+
+
+    return multiplayerState.isHost;
+
+}
+
+
+/* ================================================================
+   51. UPDATE HOST
+================================================================ */
+
+async function updateHost() {
+
+    const previousHost =
+        multiplayerState.hostId;
+
+
+    const newHost =
+        calculateHost();
+
+
+    multiplayerState.hostId =
+        newHost;
+
+
+    multiplayerState.isHost =
+        newHost ===
+        getMultiplayerUserId();
+
+
+    if (
+        previousHost !==
+        newHost
     ) {
 
-        try {
+        multiplayerEvents.emit(
+            "hostChanged",
+            {
 
-            const raw =
-                localStorage.getItem(
-                    "hokm_room"
-                );
+                previousHost,
 
-
-            if (!raw) {
-                return null;
-            }
-
-
-            const room =
-                JSON.parse(raw);
-
-
-            if (
-                room.roomCode !==
-                roomCode
-            ) {
-
-                return null;
+                newHost
 
             }
+        );
 
 
-            return room;
+        if (
+            multiplayerState.isHost
+        ) {
 
-        } catch (err) {
+            await sendMessage(
+                "host_changed",
+                {
 
-            error(
-                "Local room parse error",
-                err
+                    hostId:
+                        newHost
+
+                }
             );
-
-            return null;
 
         }
 
     }
 
 
-    /* =======================================================
-       RECONNECT
-    ======================================================== */
+    updateRoomUI();
 
-    function tryReconnect() {
+}
 
-        if (
-            !Multiplayer.roomCode
-        ) {
-            return;
+
+/* ================================================================
+   52. HANDLE HOST CHANGED
+================================================================ */
+
+function handleHostChanged(
+    message
+) {
+
+    const hostId =
+        message.data?.hostId;
+
+
+    multiplayerState.hostId =
+        hostId || null;
+
+
+    multiplayerState.isHost =
+        hostId ===
+        getMultiplayerUserId();
+
+
+    multiplayerEvents.emit(
+        "hostChanged",
+        {
+
+            hostId
+
         }
+    );
 
 
-        if (
-            Multiplayer.reconnectAttempts >=
-            Multiplayer.maxReconnectAttempts
-        ) {
+    updateRoomUI();
 
-            showToast(
-                "اتصال به اتاق قطع شد",
-                "error"
-            );
+}
 
-            return;
+
+/* ================================================================
+   53. SET PLAYER SEAT
+================================================================ */
+
+async function setLocalPlayerSeat(
+    seat
+) {
+
+    const numericSeat =
+        Number(seat);
+
+
+    if (
+        !Number.isInteger(numericSeat) ||
+        numericSeat < 0 ||
+        numericSeat >= MULTIPLAYER_CONFIG.maxPlayersPerRoom
+    ) {
+
+        return false;
+
+    }
+
+
+    multiplayerState.localPlayerSeat =
+        numericSeat;
+
+
+    await trackPresence();
+
+
+    multiplayerEvents.emit(
+        "seatChanged",
+        {
+
+            playerId:
+                getMultiplayerUserId(),
+
+            seat:
+                numericSeat
 
         }
+    );
 
 
-        Multiplayer.reconnectAttempts++;
+    return true;
+
+}
 
 
-        const delay =
-            Math.min(
-                1000 *
-                Multiplayer.reconnectAttempts,
-                5000
-            );
+/* ================================================================
+   54. FIND PLAYER BY SEAT
+================================================================ */
+
+function getPlayerBySeat(
+    seat
+) {
+
+    return (
+        multiplayerState.players.find(
+            player =>
+                Number(player.seat) ===
+                Number(seat)
+        ) ||
+        null
+    );
+
+}
 
 
+/* ================================================================
+   55. FIND PLAYER
+================================================================ */
+
+function getPlayer(
+    playerId
+) {
+
+    return (
+        multiplayerState.playerMap[
+            playerId
+        ] ||
+        multiplayerState.players.find(
+            player =>
+                player.id ===
+                playerId
+        ) ||
+        null
+    );
+
+}
+
+
+/* ================================================================
+   56. IS MY TURN
+================================================================ */
+
+function isMyTurn() {
+
+    const myId =
+        getMultiplayerUserId();
+
+
+    return (
+        !!myId &&
+        multiplayerState.currentTurn ===
+        myId
+    );
+
+}
+
+
+/* ================================================================
+   57. HEARTBEAT
+================================================================ */
+
+function startHeartbeat() {
+
+    stopHeartbeat();
+
+
+    sendHeartbeat();
+
+
+    multiplayerState.heartbeatTimer =
+        setInterval(
+            sendHeartbeat,
+            MULTIPLAYER_CONFIG.heartbeatInterval
+        );
+
+}
+
+
+function stopHeartbeat() {
+
+    if (
+        multiplayerState.heartbeatTimer
+    ) {
+
+        clearInterval(
+            multiplayerState.heartbeatTimer
+        );
+
+
+        multiplayerState.heartbeatTimer =
+            null;
+
+    }
+
+}
+
+
+async function sendHeartbeat() {
+
+    if (
+        !multiplayerState.connected
+    ) {
+
+        return;
+
+    }
+
+
+    multiplayerState.lastHeartbeatAt =
+        now();
+
+
+    await trackPresence();
+
+
+    await sendMessage(
+        "heartbeat",
+        {
+
+            playerId:
+                getMultiplayerUserId(),
+
+            timestamp:
+                now()
+
+        },
+        {
+
+            queue:
+                false
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   58. HANDLE HEARTBEAT
+================================================================ */
+
+function handleHeartbeat(
+    message
+) {
+
+    multiplayerEvents.emit(
+        "heartbeat",
+        message
+    );
+
+}
+
+
+/* ================================================================
+   59. RECONNECT
+================================================================ */
+
+function scheduleReconnect() {
+
+    if (
+        multiplayerState.reconnectTimer
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !multiplayerState.roomId
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        multiplayerState.reconnectAttempts >=
+        MULTIPLAYER_CONFIG.maxReconnectAttempts
+    ) {
+
+        multiplayerState.connectionStatus =
+            "failed";
+
+
+        multiplayerEvents.emit(
+            "reconnectFailed",
+            {
+
+                attempts:
+                    multiplayerState.reconnectAttempts
+
+            }
+        );
+
+
+        multiplayerToast(
+            "اتصال به بازی برقرار نشد. دوباره تلاش کنید.",
+            "❌",
+            5000
+        );
+
+
+        return;
+
+    }
+
+
+    multiplayerState.reconnecting =
+        true;
+
+
+    multiplayerState.connectionStatus =
+        "reconnecting";
+
+
+    multiplayerState.reconnectAttempts++;
+
+
+    const delay =
+        MULTIPLAYER_CONFIG.reconnectDelay *
+        Math.min(
+            multiplayerState.reconnectAttempts,
+            5
+        );
+
+
+    multiplayerState.reconnectTimer =
         setTimeout(
             async () => {
 
-                try {
+                multiplayerState.reconnectTimer =
+                    null;
 
-                    await joinRealtimeRoom(
-                        Multiplayer.roomCode
-                    );
 
-                } catch (err) {
+                if (
+                    multiplayerState.connected
+                ) {
 
-                    warn(
-                        "Reconnect failed",
-                        err
-                    );
-
-                    tryReconnect();
+                    return;
 
                 }
+
+
+                multiplayerEvents.emit(
+                    "reconnecting",
+                    {
+
+                        attempt:
+                            multiplayerState.reconnectAttempts
+
+                    }
+                );
+
+
+                await connectToRoom(
+                    multiplayerState.roomId,
+                    {
+
+                        reconnect:
+                            true
+
+                    }
+                );
 
             },
             delay
         );
 
+}
+
+
+/* ================================================================
+   60. MANUAL RECONNECT
+================================================================ */
+
+async function reconnectToRoom() {
+
+    const roomId =
+        multiplayerState.roomId;
+
+
+    if (
+        !roomId
+    ) {
+
+        return {
+
+            success:
+                false,
+
+            error:
+                "NO_ROOM"
+
+        };
+
     }
 
 
-    /* =======================================================
-       GAME MESSAGE SYSTEM
-       پایه ارتباط برای مراحل بعدی
-    ======================================================== */
+    multiplayerState.reconnectAttempts =
+        0;
 
-    async function sendGameMessage(
-        event,
-        payload = {}
+
+    if (
+        multiplayerState.reconnectTimer
     ) {
 
-        const channel =
-            Multiplayer.channel;
+        clearTimeout(
+            multiplayerState.reconnectTimer
+        );
 
 
-        if (!channel) {
+        multiplayerState.reconnectTimer =
+            null;
 
-            warn(
-                "No multiplayer channel"
+    }
+
+
+    return connectToRoom(
+        roomId,
+        {
+
+            reconnect:
+                true
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   61. DISCONNECT FROM ROOM
+================================================================ */
+
+async function disconnectFromRoom(
+    showMessage = true
+) {
+
+    stopHeartbeat();
+
+
+    if (
+        multiplayerState.reconnectTimer
+    ) {
+
+        clearTimeout(
+            multiplayerState.reconnectTimer
+        );
+
+
+        multiplayerState.reconnectTimer =
+            null;
+
+    }
+
+
+    const client =
+        getMultiplayerSupabaseClient();
+
+
+    const channel =
+        multiplayerState.channel;
+
+
+    if (
+        channel
+    ) {
+
+        try {
+
+            await channel.untrack();
+
+        } catch (error) {
+
+            console.warn(
+                "Presence untrack error:",
+                error
             );
-
-            return false;
 
         }
 
 
-        await channel.send({
+        if (
+            client
+        ) {
 
-            type: "broadcast",
+            try {
 
-            event,
+                await client.removeChannel(
+                    channel
+                );
 
-            payload: {
+            } catch (error) {
 
-                sender:
-                    Multiplayer.playerId,
-
-                roomCode:
-                    Multiplayer.roomCode,
-
-                timestamp:
-                    Date.now(),
-
-                ...payload
+                console.error(
+                    "Remove multiplayer channel error:",
+                    error
+                );
 
             }
 
-        });
-
-
-        return true;
+        }
 
     }
 
 
-    /* =======================================================
-       PUBLIC API
-    ======================================================== */
-
-    Multiplayer.initialize =
-        initialize;
+    const oldRoomId =
+        multiplayerState.roomId;
 
 
-    Multiplayer.createRoom =
-        createRoom;
+    multiplayerState.channel =
+        null;
 
 
-    Multiplayer.joinRoom =
-        joinRoom;
+    multiplayerState.channelName =
+        null;
 
 
-    Multiplayer.leaveRoom =
-        leaveRoom;
+    multiplayerState.roomId =
+        null;
 
 
-    Multiplayer.startGame =
-        startGame;
+    multiplayerState.connected =
+        false;
 
 
-    Multiplayer.copyRoomCode =
-        copyRoomCode;
+    multiplayerState.connecting =
+        false;
 
 
-    Multiplayer.updateRoomUI =
-        updateRoomUI;
+    multiplayerState.reconnecting =
+        false;
 
 
-    Multiplayer.showScreen =
-        showScreen;
+    multiplayerState.connectionStatus =
+        "disconnected";
 
 
-    Multiplayer.sendGameMessage =
-        sendGameMessage;
+    multiplayerState.connectionError =
+        null;
 
 
-    Multiplayer.getCurrentSeat =
-        getCurrentSeat;
+    multiplayerState.players =
+        [];
 
 
-    Multiplayer.getRoomPlayers =
-        getRoomPlayers;
+    multiplayerState.playerMap =
+        {};
 
 
-    /* =======================================================
-       BUTTON EVENTS
-    ======================================================== */
+    multiplayerState.presence =
+        {};
+
+
+    multiplayerState.readyPlayers =
+        {};
+
+
+    multiplayerState.currentTurn =
+        null;
+
+
+    multiplayerState.gameStarted =
+        false;
+
+
+    multiplayerState.gameFinished =
+        false;
+
+
+    multiplayerState.gameStateVersion =
+        0;
+
+
+    multiplayerState.lastGameState =
+        null;
+
+
+    multiplayerState.pendingActions =
+        [];
+
+
+    multiplayerEvents.emit(
+        "disconnected",
+        {
+
+            roomId:
+                oldRoomId
+
+        }
+    );
+
+
+    multiplayerEvents.emit(
+        "connectionStateChanged",
+        getMultiplayerPublicState()
+    );
+
+
+    if (
+        showMessage
+    ) {
+
+        multiplayerToast(
+            "از بازی آنلاین خارج شدی.",
+            "🔴"
+        );
+
+    }
+
+
+    return true;
+
+}
+
+
+/* ================================================================
+   62. LEAVE ROOM
+================================================================ */
+
+async function leaveRoom() {
+
+    if (
+        multiplayerState.connected
+    ) {
+
+        try {
+
+            await sendMessage(
+                "player_left",
+                {
+
+                    player: {
+
+                        id:
+                            getMultiplayerUserId(),
+
+                        name:
+                            getMultiplayerPlayerName()
+
+                    }
+
+                },
+                {
+
+                    queue:
+                        false
+
+                }
+            );
+
+        } catch (error) {
+
+            console.warn(
+                "Leave announcement failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    return disconnectFromRoom(
+        true
+    );
+
+}
+
+
+/* ================================================================
+   63. PING SERVER
+================================================================ */
+
+async function ping() {
+
+    const pingId =
+        generateId(
+            "ping"
+        );
+
+
+    const startedAt =
+        now();
+
+
+    return new Promise(
+        async resolve => {
+
+            let finished =
+                false;
+
+
+            const unsubscribe =
+                multiplayerEvents.on(
+                    "pong",
+                    message => {
+
+                        if (
+                            message.data?.pingId !==
+                            pingId
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            finished
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        finished =
+                            true;
+
+
+                        unsubscribe();
+
+
+                        resolve({
+
+                            success:
+                                true,
+
+                            latency:
+                                now() -
+                                startedAt
+
+                        });
+
+                    }
+                );
+
+
+            await sendMessage(
+                "ping",
+                {
+
+                    pingId
+
+                },
+                {
+
+                    queue:
+                        false
+
+                }
+            );
+
+
+            setTimeout(
+                () => {
+
+                    if (
+                        finished
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    finished =
+                        true;
+
+
+                    unsubscribe();
+
+
+                    resolve({
+
+                        success:
+                            false,
+
+                        latency:
+                            null
+
+                    });
+
+                },
+                MULTIPLAYER_CONFIG.messageTimeout
+            );
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   64. CLEAN RECEIVED ACTIONS
+================================================================ */
+
+function cleanupReceivedMessages() {
+
+    const expiration =
+        now() -
+        60000;
+
+
+    Object.keys(
+        multiplayerState.receivedActions
+    ).forEach(
+        key => {
+
+            if (
+                multiplayerState.receivedActions[key] <
+                expiration
+            ) {
+
+                delete multiplayerState.receivedActions[
+                    key
+                ];
+
+            }
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   65. GET PUBLIC STATE
+================================================================ */
+
+function getMultiplayerPublicState() {
+
+    return {
+
+        initialized:
+            multiplayerState.initialized,
+
+        connected:
+            multiplayerState.connected,
+
+        connecting:
+            multiplayerState.connecting,
+
+        reconnecting:
+            multiplayerState.reconnecting,
+
+        roomId:
+            multiplayerState.roomId,
+
+        channelName:
+            multiplayerState.channelName,
+
+        connectionStatus:
+            multiplayerState.connectionStatus,
+
+        reconnectAttempts:
+            multiplayerState.reconnectAttempts,
+
+        players:
+            cloneData(
+                multiplayerState.players
+            ),
+
+        localPlayerId:
+            multiplayerState.localPlayerId,
+
+        localPlayerName:
+            multiplayerState.localPlayerName,
+
+        localPlayerSeat:
+            multiplayerState.localPlayerSeat,
+
+        isHost:
+            isCurrentHost(),
+
+        hostId:
+            multiplayerState.hostId,
+
+        readyPlayers:
+            cloneData(
+                multiplayerState.readyPlayers
+            ),
+
+        currentTurn:
+            multiplayerState.currentTurn,
+
+        gameStarted:
+            multiplayerState.gameStarted,
+
+        gameFinished:
+            multiplayerState.gameFinished,
+
+        gameStateVersion:
+            multiplayerState.gameStateVersion,
+
+        lastConnectionAt:
+            multiplayerState.lastConnectionAt,
+
+        lastMessageAt:
+            multiplayerState.lastMessageAt
+
+    };
+
+}
+
+
+/* ================================================================
+   66. ROOM UI UPDATE
+================================================================ */
+
+function updateRoomUI() {
+
+    multiplayerEvents.emit(
+        "uiUpdate",
+        getMultiplayerPublicState()
+    );
+
+
+    if (
+        typeof window.updateRoomPlayersUI === "function"
+    ) {
+
+        try {
+
+            window.updateRoomPlayersUI(
+                cloneData(
+                    multiplayerState.players
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "updateRoomPlayersUI error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    if (
+        typeof window.updateOnlinePlayersUI === "function"
+    ) {
+
+        try {
+
+            window.updateOnlinePlayersUI(
+                cloneData(
+                    multiplayerState.players
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "updateOnlinePlayersUI error:",
+                error
+            );
+
+        }
+
+    }
+
+}
+
+
+/* ================================================================
+   67. GAME UI UPDATE
+================================================================ */
+
+function updateGameUI() {
+
+    multiplayerEvents.emit(
+        "gameUIUpdate",
+        {
+
+            currentTurn:
+                multiplayerState.currentTurn,
+
+            gameStarted:
+                multiplayerState.gameStarted,
+
+            gameFinished:
+                multiplayerState.gameFinished,
+
+            players:
+                cloneData(
+                    multiplayerState.players
+                )
+
+        }
+    );
+
+
+    if (
+        typeof window.updateGameOnlineUI === "function"
+    ) {
+
+        try {
+
+            window.updateGameOnlineUI(
+                getMultiplayerPublicState()
+            );
+
+        } catch (error) {
+
+            console.error(
+                "updateGameOnlineUI error:",
+                error
+            );
+
+        }
+
+    }
+
+}
+
+
+/* ================================================================
+   68. GET PLAYERS COUNT
+================================================================ */
+
+function getPlayersCount() {
+
+    return multiplayerState.players.length;
+
+}
+
+
+/* ================================================================
+   69. GET ONLINE PLAYERS COUNT
+================================================================ */
+
+function getOnlinePlayersCount() {
+
+    return multiplayerState.players.filter(
+        player =>
+            player.online !== false
+    ).length;
+
+}
+
+
+/* ================================================================
+   70. ROOM FULL
+================================================================ */
+
+function isRoomFull() {
+
+    return (
+        getPlayersCount() >=
+        MULTIPLAYER_CONFIG.maxPlayersPerRoom
+    );
+
+}
+
+
+/* ================================================================
+   71. CAN START GAME
+================================================================ */
+
+function canStartMultiplayerGame() {
+
+    return (
+
+        isCurrentHost() &&
+
+        !multiplayerState.gameStarted &&
+
+        !multiplayerState.gameFinished &&
+
+        getPlayersCount() >= 2
+
+    );
+
+}
+
+
+/* ================================================================
+   72. CAN MAKE MOVE
+================================================================ */
+
+function canMakeOnlineMove() {
+
+    if (
+        !multiplayerState.connected
+    ) {
+
+        return false;
+
+    }
+
+
+    if (
+        !multiplayerState.gameStarted
+    ) {
+
+        return false;
+
+    }
+
+
+    if (
+        multiplayerState.gameFinished
+    ) {
+
+        return false;
+
+    }
+
+
+    return isMyTurn();
+
+}
+
+
+/* ================================================================
+   73. SET ROOM ID
+================================================================ */
+
+function setMultiplayerRoomId(
+    roomId
+) {
+
+    multiplayerState.roomId =
+        roomId
+            ? safeString(roomId).trim()
+            : null;
+
+}
+
+
+/* ================================================================
+   74. SET HOST
+================================================================ */
+
+function setMultiplayerHost(
+    hostId
+) {
+
+    multiplayerState.hostId =
+        hostId || null;
+
+
+    multiplayerState.isHost =
+        hostId ===
+        getMultiplayerUserId();
+
+
+    updateRoomUI();
+
+}
+
+
+/* ================================================================
+   75. RESET GAME NETWORK STATE
+================================================================ */
+
+function resetMultiplayerGameState() {
+
+    multiplayerState.gameStarted =
+        false;
+
+
+    multiplayerState.gameFinished =
+        false;
+
+
+    multiplayerState.currentTurn =
+        null;
+
+
+    multiplayerState.gameStateVersion =
+        0;
+
+
+    multiplayerState.lastGameState =
+        null;
+
+
+    multiplayerState.pendingActions =
+        [];
+
+
+    multiplayerState.sentActions =
+        {};
+
+
+    multiplayerState.receivedActions =
+        {};
+
+
+    multiplayerEvents.emit(
+        "gameNetworkReset",
+        null
+    );
+
+}
+
+
+/* ================================================================
+   76. ERROR HANDLER
+================================================================ */
+
+function handleMultiplayerError(
+    error,
+    context = ""
+) {
+
+    console.error(
+        "Multiplayer Error:",
+        context,
+        error
+    );
+
+
+    multiplayerState.connectionError =
+        error;
+
+
+    multiplayerEvents.emit(
+        "error",
+        {
+
+            error,
+
+            context
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   77. NETWORK ONLINE/OFFLINE
+================================================================ */
+
+function setupNetworkListeners() {
+
+    window.addEventListener(
+        "online",
+        async () => {
+
+            multiplayerEvents.emit(
+                "networkOnline",
+                null
+            );
+
+
+            if (
+                multiplayerState.roomId &&
+                !multiplayerState.connected
+            ) {
+
+                await reconnectToRoom();
+
+            }
+
+        }
+    );
+
+
+    window.addEventListener(
+        "offline",
+        () => {
+
+            multiplayerState.connectionStatus =
+                "offline";
+
+
+            multiplayerEvents.emit(
+                "networkOffline",
+                null
+            );
+
+
+            multiplayerToast(
+                "اتصال اینترنت قطع شد. در حال تلاش برای اتصال مجدد...",
+                "📡",
+                4000
+            );
+
+        }
+    );
+
+}
+
+
+/* ================================================================
+   78. ROOM EVENT HELPERS
+================================================================ */
+
+function onMultiplayerEvent(
+    eventName,
+    callback
+) {
+
+    return multiplayerEvents.on(
+        eventName,
+        callback
+    );
+
+}
+
+
+function onMultiplayerConnected(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "connected",
+        callback
+    );
+
+}
+
+
+function onMultiplayerDisconnected(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "disconnected",
+        callback
+    );
+
+}
+
+
+function onPlayersUpdated(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "playersUpdated",
+        callback
+    );
+
+}
+
+
+function onGameAction(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "gameAction",
+        callback
+    );
+
+}
+
+
+function onGameStateUpdated(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "gameStateUpdated",
+        callback
+    );
+
+}
+
+
+function onTurnChanged(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "turnChanged",
+        callback
+    );
+
+}
+
+
+function onChatMessage(
+    callback
+) {
+
+    return multiplayerEvents.on(
+        "chatMessage",
+        callback
+    );
+
+}
+
+
+/* ================================================================
+   79. DEBUG INFORMATION
+================================================================ */
+
+function getMultiplayerDebugInfo() {
+
+    return {
+
+        state:
+            getMultiplayerPublicState(),
+
+        pendingMessages:
+            multiplayerState.pendingMessages.length,
+
+        pendingActions:
+            multiplayerState.pendingActions.length,
+
+        receivedActions:
+            Object.keys(
+                multiplayerState.receivedActions
+            ).length,
+
+        sentActions:
+            Object.keys(
+                multiplayerState.sentActions
+            ).length,
+
+        lastHeartbeat:
+            multiplayerState.lastHeartbeatAt,
+
+        lastMessage:
+            multiplayerState.lastMessageAt,
+
+        version:
+            MULTIPLAYER_CONFIG.version
+
+    };
+
+}
+
+
+/* ================================================================
+   80. PUBLIC API
+================================================================ */
+
+window.hokmMultiplayer = {
+
+    initialize:
+        initializeMultiplayer,
+
+    connectToRoom,
+
+    disconnectFromRoom,
+
+    leaveRoom,
+
+    reconnectToRoom,
+
+    sendMessage,
+
+    sendGameAction,
+
+    sendGameState,
+
+    startMultiplayerGame,
+
+    finishMultiplayerGame,
+
+    setCurrentTurn,
+
+    setPlayerReady,
+
+    setLocalPlayerSeat,
+
+    sendChatMessage:
+        sendMultiplayerChatMessage,
+
+    requestRoomSync,
+
+    sendRoomSync,
+
+    getPlayer,
+
+    getPlayerBySeat,
+
+    getPlayersCount,
+
+    getOnlinePlayersCount,
+
+    isRoomFull,
+
+    isMyTurn,
+
+    canMakeMove,
+
+    canStartGame:
+        canStartMultiplayerGame,
+
+    isCurrentHost,
+
+    updateHost,
+
+    setMultiplayerRoomId,
+
+    setMultiplayerHost,
+
+    resetMultiplayerGameState,
+
+    getState:
+        getMultiplayerPublicState,
+
+    getDebugInfo:
+        getMultiplayerDebugInfo,
+
+    ping,
+
+    on:
+        onMultiplayerEvent,
+
+    onConnected:
+        onMultiplayerConnected,
+
+    onDisconnected:
+        onMultiplayerDisconnected,
+
+    onPlayersUpdated,
+
+    onGameAction,
+
+    onGameStateUpdated,
+
+    onTurnChanged,
+
+    onChatMessage
+
+};
+
+
+/* ================================================================
+   81. GLOBAL SHORTCUTS
+================================================================ */
+
+window.connectToRoom =
+    connectToRoom;
+
+
+window.disconnectFromRoom =
+    disconnectFromRoom;
+
+
+window.leaveOnlineRoom =
+    leaveRoom;
+
+
+window.reconnectToRoom =
+    reconnectToRoom;
+
+
+window.sendMultiplayerMessage =
+    sendMessage;
+
+
+window.sendGameAction =
+    sendGameAction;
+
+
+window.sendGameState =
+    sendGameState;
+
+
+window.startMultiplayerGame =
+    startMultiplayerGame;
+
+
+window.finishMultiplayerGame =
+    finishMultiplayerGame;
+
+
+window.setMultiplayerTurn =
+    setCurrentTurn;
+
+
+window.setPlayerReady =
+    setPlayerReady;
+
+
+window.sendMultiplayerChatMessage =
+    sendMultiplayerChatMessage;
+
+
+window.isMyTurn =
+    isMyTurn;
+
+
+window.canMakeOnlineMove =
+    canMakeOnlineMove;
+
+
+window.getOnlinePlayers =
+    function () {
+
+        return cloneData(
+            multiplayerState.players
+        );
+
+    };
+
+
+/* ================================================================
+   82. AUTO INITIALIZATION
+================================================================ */
+
+function startMultiplayerInitialization() {
+
+    if (
+        initializeMultiplayer()
+    ) {
+
+        setupNetworkListeners();
+
+    }
+
+}
+
+
+if (
+    document.readyState === "loading"
+) {
 
     document.addEventListener(
         "DOMContentLoaded",
-        () => {
-
-            initialize();
-
-
-            /*
-             * ساخت اتاق
-             */
-
-            const createButton =
-                document.getElementById(
-                    "confirmCreateRoomButton"
-                );
-
-
-            if (createButton) {
-
-                createButton.addEventListener(
-                    "click",
-                    async () => {
-
-                        const roomNameInput =
-                            document.getElementById(
-                                "roomNameInput"
-                            );
-
-
-                        const entryInput =
-                            document.getElementById(
-                                "roomEntryInput"
-                            );
-
-
-                        const privateSwitch =
-                            document.getElementById(
-                                "privateRoomSwitch"
-                            );
-
-
-                        const roomName =
-                            roomNameInput
-                                ? roomNameInput.value.trim()
-                                : "اتاق حکم";
-
-
-                        const entryFee =
-                            entryInput
-                                ? Number(
-                                    entryInput.value
-                                )
-                                : 0;
-
-
-                        const isPrivate =
-                            privateSwitch
-                                ? privateSwitch.checked
-                                : true;
-
-
-                        const result =
-                            await createRoom({
-
-                                roomName,
-
-                                entryFee,
-
-                                isPrivate
-
-                            });
-
-
-                        if (
-                            result.success
-                        ) {
-
-                            showScreen(
-                                "roomScreen"
-                            );
-
-                        }
-
-                    }
-                );
-
-            }
-
-
-            /*
-             * ورود به اتاق
-             */
-
-            const joinButton =
-                document.getElementById(
-                    "confirmJoinRoomButton"
-                );
-
-
-            if (joinButton) {
-
-                joinButton.addEventListener(
-                    "click",
-                    async () => {
-
-                        const input =
-                            document.getElementById(
-                                "roomCodeInput"
-                            );
-
-
-                        const code =
-                            input
-                                ? input.value
-                                : "";
-
-
-                        const result =
-                            await joinRoom(
-                                code
-                            );
-
-
-                        if (
-                            result.success
-                        ) {
-
-                            showScreen(
-                                "roomScreen"
-                            );
-
-                        }
-
-                    }
-                );
-
-            }
-
-
-            /*
-             * شروع بازی
-             */
-
-            const startButton =
-                document.getElementById(
-                    "startGameButton"
-                );
-
-
-            if (startButton) {
-
-                startButton.addEventListener(
-                    "click",
-                    () => {
-
-                        startGame();
-
-                    }
-                );
-
-            }
-
-
-            /*
-             * خروج از اتاق
-             */
-
-            const leaveButton =
-                document.getElementById(
-                    "leaveRoomButton"
-                );
-
-
-            if (leaveButton) {
-
-                leaveButton.addEventListener(
-                    "click",
-                    () => {
-
-                        leaveRoom();
-
-                    }
-                );
-
-            }
-
-
-            /*
-             * کپی کد اتاق
-             */
-
-            const copyButton =
-                document.getElementById(
-                    "copyRoomCodeButton"
-                );
-
-
-            if (copyButton) {
-
-                copyButton.addEventListener(
-                    "click",
-                    () => {
-
-                        copyRoomCode();
-
-                    }
-                );
-
-            }
-
-        }
+        startMultiplayerInitialization
     );
 
+} else {
 
-    /* =======================================================
-       AUTO INITIALIZATION
-    ======================================================== */
+    startMultiplayerInitialization();
 
-    initialize();
-
-
-    log(
-        "Hokm Multiplayer module loaded successfully."
-    );
+}
 
 
-})();
+/* ================================================================
+   END OF multiplayer.js
+================================================================ */
