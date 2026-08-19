@@ -1,401 +1,478 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-
 <head>
-
     <meta charset="UTF-8">
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     >
 
     <meta
         name="theme-color"
-        content="#08111f"
+        content="#0b1730"
     >
 
     <meta
         name="description"
-        content="Hokm Online - بازی آنلاین حکم"
+        content="حکم آنلاین؛ بازی چهار نفره حکم با دوستان و بازیکنان واقعی"
     >
 
     <meta
-        name="mobile-web-app-capable"
-        content="yes"
+        name="keywords"
+        content="حکم آنلاین، بازی حکم، حکم چهار نفره، بازی کارتی، بازی آنلاین"
     >
 
     <meta
-        name="apple-mobile-web-app-capable"
-        content="yes"
+        name="author"
+        content="Hokm Online"
     >
 
-    <title>
-        حکم آنلاین
-    </title>
+    <meta
+        name="robots"
+        content="index, follow"
+    >
 
+    <title>حکم آنلاین | بازی حکم چهار نفره</title>
 
     <!-- =========================================================
-         FONTS
-    ========================================================== -->
-
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
-
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap"
-        rel="stylesheet"
-    >
-
+         SUPABASE
+         ========================================================= -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        defer
+    ></script>
 
     <!-- =========================================================
-         MAIN CSS
-    ========================================================== -->
-
+         CSS
+         ========================================================= -->
     <link
         rel="stylesheet"
         href="style.css"
     >
 
-</head>
+    <!-- =========================================================
+         BASIC MOBILE / APP STYLE
+         ========================================================= -->
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            background: #0b1730;
+        }
 
+        body {
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font-family: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                radial-gradient(
+                    circle at center,
+                    rgba(39, 73, 128, 0.95),
+                    rgba(5, 13, 29, 0.99)
+                );
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .loading-card {
+            width: min(90%, 360px);
+            padding: 28px 22px;
+            box-sizing: border-box;
+            text-align: center;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(18px);
+            color: #fff;
+        }
+
+        .loading-spinner {
+            width: 44px;
+            height: 44px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #f5bd25;
+            animation: hokmSpin 0.8s linear infinite;
+        }
+
+        @keyframes hokmSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .app {
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        .screen {
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        .toast-container {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            bottom: 90px;
+            z-index: 99998;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            max-width: 420px;
+            margin: 0 auto;
+            padding: 13px 16px;
+            border-radius: 14px;
+            color: #fff;
+            background: rgba(17, 25, 43, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+            pointer-events: auto;
+            animation: toastIn 0.25s ease;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
 
 <body>
 
-
-<!-- =============================================================
-     APP
-============================================================== -->
-
-<div
-    id="app"
-    class="app"
->
-
-
     <!-- =========================================================
-         TOP HEADER
-    ========================================================== -->
-
-    <header
-        class="top-header"
+         APPLICATION ROOT
+         ========================================================= -->
+    <div
+        id="app"
+        class="app"
     >
 
+        <!-- =====================================================
+             LOADING OVERLAY
+             ===================================================== -->
         <div
-            class="header-right"
+            id="loadingOverlay"
+            class="loading-overlay"
         >
+            <div class="loading-card">
 
-            <button
-                id="profileButton"
-                class="header-profile-button"
-                type="button"
-                aria-label="پروفایل"
-            >
+                <div class="loading-spinner"></div>
 
-                <span
-                    class="header-avatar"
-                >
-                    👤
-                </span>
-
-                <span
-                    class="header-player-info"
-                >
-
-                    <strong
-                        id="playerName"
-                    >
-                        بازیکن مهمان
-                    </strong>
-
-                    <small>
-                        سطح
-                        <span id="playerLevel">
-                            1
-                        </span>
-                    </small>
-
-                </span>
-
-            </button>
-
-        </div>
-
-
-        <div
-            class="header-center"
-        >
-
-            <div
-                class="logo"
-            >
-
-                <span
-                    class="logo-icon"
-                >
-                    ♠
-                </span>
-
-                <span
-                    class="logo-text"
-                >
-                    حکم آنلاین
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <div
-            class="header-left"
-        >
-
-            <div
-                class="coin-box"
-            >
-
-                <span
-                    class="coin-icon"
-                >
-                    🪙
-                </span>
-
-                <strong
-                    id="coinBalance"
-                >
-                    ۱٬۰۰۰
+                <strong>
+                    <span id="loadingMessage">
+                        در حال آماده‌سازی بازی...
+                    </span>
                 </strong>
 
             </div>
-
-
-            <button
-                id="settingsButton"
-                class="icon-button"
-                type="button"
-                aria-label="تنظیمات"
-            >
-                ⚙️
-            </button>
-
         </div>
-
-    </header>
-
-
-
-    <!-- =========================================================
-         MAIN CONTENT
-    ========================================================== -->
-
-    <main
-        class="main-content"
-    >
 
 
         <!-- =====================================================
-             HOME SCREEN
-        ====================================================== -->
-
-        <section
+             MAIN HOME SCREEN
+             ===================================================== -->
+        <main
             id="homeScreen"
-            class="screen active-screen"
+            class="screen home-screen"
         >
 
-            <div
-                class="home-hero"
+            <!-- =================================================
+                 TOP HEADER
+                 ================================================= -->
+            <header
+                id="homeHeader"
+                class="app-header"
             >
 
                 <div
-                    class="hero-decoration hero-decoration-one"
+                    id="guestStatus"
+                    class="guest-status"
+                >
+                    👤
+                    <span>
+                        بازیکن مهمان
+                    </span>
+
+                    <span
+                        id="playerLevel"
+                    >
+                        سطح 1
+                    </span>
+                </div>
+
+
+                <div
+                    id="homeTitle"
+                    class="home-title"
+                >
+                    ♠️
+                    <span>
+                        حکم آنلاین
+                    </span>
+                </div>
+
+
+                <div
+                    id="coinDisplay"
+                    class="coin-display"
+                >
+                    <span class="coin-icon">
+                        🪙
+                    </span>
+
+                    <span
+                        id="coinBalance"
+                    >
+                        3000
+                    </span>
+                </div>
+
+
+                <button
+                    id="settingsButton"
+                    class="icon-button"
+                    type="button"
+                    aria-label="تنظیمات"
+                >
+                    ⚙️
+                </button>
+
+            </header>
+
+
+            <!-- =================================================
+                 QUICK NAVIGATION
+                 ================================================= -->
+            <nav
+                id="quickNavigation"
+                class="quick-navigation"
+                aria-label="ناوبری سریع"
+            >
+
+                <button
+                    id="quickSpades"
+                    type="button"
+                    class="quick-nav-item"
                 >
                     ♠
-                </div>
+                </button>
 
-                <div
-                    class="hero-decoration hero-decoration-two"
+                <button
+                    id="quickHearts"
+                    type="button"
+                    class="quick-nav-item"
                 >
                     ♥
-                </div>
+                </button>
 
-                <div
-                    class="hero-decoration hero-decoration-three"
+                <button
+                    id="quickDiamonds"
+                    type="button"
+                    class="quick-nav-item"
                 >
                     ♦
-                </div>
+                </button>
 
-                <div
-                    class="hero-decoration hero-decoration-four"
+                <button
+                    id="quickClubs"
+                    type="button"
+                    class="quick-nav-item"
                 >
                     ♣
-                </div>
+                </button>
 
+                <button
+                    id="quickLeaderboard"
+                    type="button"
+                    class="quick-nav-item"
+                >
+                    🏆
+                </button>
+
+            </nav>
+
+
+            <!-- =================================================
+                 HOME CONTENT
+                 ================================================= -->
+            <section
+                id="homeContent"
+                class="home-content"
+            >
 
                 <div
-                    class="hero-content"
+                    id="homeWelcome"
+                    class="home-welcome"
                 >
 
                     <div
-                        class="hero-badge"
+                        id="homeEyebrow"
+                        class="home-eyebrow"
                     >
-                        🏆
-                        بازی آنلاین حکم
+                        🏆 بازی آنلاین حکم
                     </div>
 
                     <h1>
-                        آماده‌ای
-                        <span>
-                            حکم
-                        </span>
-                        بازی کنی؟
+                        آماده‌ای حکم بازی کنی؟
                     </h1>
 
                     <p>
-                        وارد یک میز حرفه‌ای شو،
-                        دوستانت را دعوت کن و برای
-                        پیروزی بجنگ.
+                        وارد یک میز حرفه‌ای شو، دوستانت را دعوت کن
+                        و برای پیروزی بجنگ!
                     </p>
 
+                </div>
 
-                    <div
-                        class="hero-actions"
+
+                <!-- =================================================
+                     MAIN GAME ACTIONS
+                     ================================================= -->
+                <section
+                    id="gameActions"
+                    class="game-actions"
+                >
+
+                    <button
+                        id="quickGameButton"
+                        type="button"
+                        class="primary-action"
                     >
-
-                        <button
-                            id="quickPlayButton"
-                            class="primary-button hero-main-button"
-                            type="button"
-                        >
-                            <span>
-                                ⚡
-                            </span>
-
+                        <span>
                             بازی سریع
+                        </span>
 
-                        </button>
+                        <span>
+                            ⚡
+                        </span>
+                    </button>
 
 
-                        <button
-                            id="createRoomButton"
-                            class="secondary-button"
-                            type="button"
-                        >
-                            <span>
-                                ➕
-                            </span>
-
+                    <button
+                        id="createRoomButton"
+                        type="button"
+                        class="secondary-action"
+                    >
+                        <span>
                             ساخت اتاق
+                        </span>
 
-                        </button>
+                        <span>
+                            ＋
+                        </span>
+                    </button>
 
 
-                        <button
-                            id="joinRoomButton"
-                            class="secondary-button"
-                            type="button"
-                        >
-                            <span>
-                                🚪
-                            </span>
-
+                    <button
+                        id="joinRoomButton"
+                        type="button"
+                        class="secondary-action"
+                    >
+                        <span>
                             ورود به اتاق
+                        </span>
 
-                        </button>
+                        <span>
+                            🚪
+                        </span>
+                    </button>
 
+                </section>
+
+
+                <!-- =================================================
+                     FEATURES
+                     ================================================= -->
+                <section
+                    id="featuresSection"
+                    class="features-section"
+                >
+
+                    <div class="feature-item">
+                        <span>🎮</span>
+                        <strong>
+                            بازی آنلاین رقابت با بازیکنان
+                        </strong>
                     </div>
 
-                </div>
+                    <div class="feature-item">
+                        <span>👥</span>
+                        <strong>
+                            میزهای ۴ نفره بازی تیمی واقعی
+                        </strong>
+                    </div>
 
-            </div>
+                    <div class="feature-item">
+                        <span>🏆</span>
+                        <strong>
+                            رتبه‌بندی برای رتبه بهتر
+                        </strong>
+                    </div>
+
+                    <div class="feature-item">
+                        <span>💬</span>
+                        <strong>
+                            چت و ارتباط با بازیکنان
+                        </strong>
+                    </div>
+
+                </section>
 
 
-            <!-- HOME STATS -->
-
-            <div
-                class="home-stats"
-            >
-
-                <div
-                    class="stat-card"
+                <!-- =================================================
+                     PROMOTIONAL SECTION
+                     ================================================= -->
+                <section
+                    id="professionalSection"
+                    class="professional-section"
                 >
 
-                    <span
-                        class="stat-icon"
-                    >
-                        🎮
-                    </span>
-
-                    <strong>
-                        بازی آنلاین
-                    </strong>
-
-                    <small>
-                        رقابت با بازیکنان
-                    </small>
-
-                </div>
-
-
-                <div
-                    class="stat-card"
-                >
-
-                    <span
-                        class="stat-icon"
-                    >
-                        👥
-                    </span>
-
-                    <strong>
-                        میزهای ۴ نفره
-                    </strong>
-
-                    <small>
-                        بازی تیمی واقعی
-                    </small>
-
-                </div>
-
-
-                <div
-                    class="stat-card"
-                >
-
-                    <span
-                        class="stat-icon"
-                    >
-                        🏆
-                    </span>
-
-                    <strong>
-                        رتبه‌بندی
-                    </strong>
-
-                    <small>
-                        رقابت برای رتبه بهتر
-                    </small>
-
-                </div>
-
-            </div>
-
-
-            <!-- HOME FEATURES -->
-
-            <div
-                class="section-header"
-            >
-
-                <div>
                     <span>
                         امکانات
                     </span>
@@ -403,982 +480,425 @@
                     <h2>
                         همه‌چیز برای یک بازی حرفه‌ای
                     </h2>
-                </div>
 
-            </div>
+                </section>
 
-
-            <div
-                class="feature-grid"
-            >
-
-                <article
-                    class="feature-card"
-                >
-
-                    <div
-                        class="feature-icon"
-                    >
-                        ⚡
-                    </div>
-
-                    <h3>
-                        بازی سریع
-                    </h3>
-
-                    <p>
-                        سریع وارد یک میز بازی شو.
-                    </p>
-
-                </article>
+            </section>
 
 
-                <article
-                    class="feature-card"
-                >
-
-                    <div
-                        class="feature-icon"
-                    >
-                        🔐
-                    </div>
-
-                    <h3>
-                        اتاق خصوصی
-                    </h3>
-
-                    <p>
-                        دوستانت را با کد اتاق دعوت کن.
-                    </p>
-
-                </article>
-
-
-                <article
-                    class="feature-card"
-                >
-
-                    <div
-                        class="feature-icon"
-                    >
-                        🪙
-                    </div>
-
-                    <h3>
-                        سیستم سکه
-                    </h3>
-
-                    <p>
-                        سکه جمع کن و آیتم‌های بازی را باز کن.
-                    </p>
-
-                </article>
-
-
-                <article
-                    class="feature-card"
-                >
-
-                    <div
-                        class="feature-icon"
-                    >
-                        🏆
-                    </div>
-
-                    <h3>
-                        جدول رتبه‌بندی
-                    </h3>
-
-                    <p>
-                        جایگاه خودت را در بین بازیکنان ببین.
-                    </p>
-
-                </article>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================================
-             CREATE ROOM SCREEN
-        ====================================================== -->
-
-        <section
-            id="createRoomScreen"
-            class="screen"
-        >
-
-            <div
-                class="page-header"
+            <!-- =================================================
+                 BOTTOM NAVIGATION
+                 ================================================= -->
+            <nav
+                id="bottomNavigation"
+                class="bottom-navigation"
+                aria-label="منوی اصلی"
             >
 
                 <button
-                    class="back-button"
-                    data-back="homeScreen"
+                    id="profileNavButton"
                     type="button"
+                    class="bottom-nav-item"
                 >
-                    ←
+                    <span>👤</span>
+                    <small>پروفایل</small>
                 </button>
-
-                <div>
-                    <span>
-                        اتاق جدید
-                    </span>
-
-                    <h1>
-                        ساخت اتاق
-                    </h1>
-                </div>
-
-            </div>
-
-
-            <div
-                class="form-card"
-            >
-
-                <div
-                    class="form-group"
-                >
-
-                    <label
-                        for="roomNameInput"
-                    >
-                        نام اتاق
-                    </label>
-
-                    <input
-                        id="roomNameInput"
-                        class="form-input"
-                        type="text"
-                        maxlength="40"
-                        placeholder="نام اتاق"
-                        autocomplete="off"
-                    >
-
-                </div>
-
-
-                <div
-                    class="form-group"
-                >
-
-                    <label
-                        for="roomEntryInput"
-                    >
-                        هزینه ورود
-                    </label>
-
-                    <div
-                        class="input-with-icon"
-                    >
-
-                        <input
-                            id="roomEntryInput"
-                            class="form-input"
-                            type="number"
-                            min="0"
-                            step="25"
-                            value="0"
-                        >
-
-                        <span>
-                            🪙
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-                <label
-                    class="switch-row"
-                >
-
-                    <span>
-
-                        <strong>
-                            اتاق خصوصی
-                        </strong>
-
-                        <small>
-                            فقط بازیکنانی که کد اتاق را دارند وارد شوند.
-                        </small>
-
-                    </span>
-
-                    <input
-                        id="privateRoomSwitch"
-                        type="checkbox"
-                        checked
-                    >
-
-                    <span
-                        class="switch"
-                    ></span>
-
-                </label>
 
 
                 <button
-                    id="confirmCreateRoomButton"
-                    class="primary-button full-width"
+                    id="shopNavButton"
                     type="button"
+                    class="bottom-nav-item"
                 >
-                    🎮 ساخت اتاق
+                    <span>🛍️</span>
+                    <small>فروشگاه</small>
                 </button>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================================
-             JOIN ROOM SCREEN
-        ====================================================== -->
-
-        <section
-            id="joinRoomScreen"
-            class="screen"
-        >
-
-            <div
-                class="page-header"
-            >
-
-                <button
-                    class="back-button"
-                    data-back="homeScreen"
-                    type="button"
-                >
-                    ←
-                </button>
-
-                <div>
-                    <span>
-                        ورود
-                    </span>
-
-                    <h1>
-                        ورود به اتاق
-                    </h1>
-                </div>
-
-            </div>
-
-
-            <div
-                class="form-card centered-form"
-            >
-
-                <div
-                    class="join-room-icon"
-                >
-                    🚪
-                </div>
-
-                <h2>
-                    کد اتاق را وارد کن
-                </h2>
-
-                <p>
-                    کد ۶ رقمی اتاق را از میزبان دریافت کن.
-                </p>
-
-
-                <div
-                    class="form-group"
-                >
-
-                    <label
-                        for="roomCodeInput"
-                    >
-                        کد اتاق
-                    </label>
-
-                    <input
-                        id="roomCodeInput"
-                        class="form-input room-code-input"
-                        type="text"
-                        inputmode="numeric"
-                        maxlength="6"
-                        placeholder="••••••"
-                        autocomplete="off"
-                    >
-
-                </div>
 
 
                 <button
-                    id="confirmJoinRoomButton"
-                    class="primary-button full-width"
+                    id="leaderboardNavButton"
                     type="button"
+                    class="bottom-nav-item"
                 >
-                    ورود به اتاق
+                    <span>🏆</span>
+                    <small>رتبه‌بندی</small>
                 </button>
 
-            </div>
 
-        </section>
+                <button
+                    id="homeNavButton"
+                    type="button"
+                    class="bottom-nav-item active"
+                >
+                    <span>🏠</span>
+                    <small>خانه</small>
+                </button>
 
+            </nav>
+
+        </main>
 
 
         <!-- =====================================================
              ROOM SCREEN
-        ====================================================== -->
-
+             ===================================================== -->
         <section
             id="roomScreen"
-            class="screen"
+            class="screen room-screen hidden"
         >
 
+            <header class="screen-header">
+
+                <button
+                    id="roomBackButton"
+                    type="button"
+                >
+                    ←
+                </button>
+
+                <h2>
+                    اتاق بازی
+                </h2>
+
+            </header>
+
+
             <div
-                class="page-header room-header"
+                id="roomContent"
+                class="room-content"
             >
 
-                <div>
+                <div
+                    id="roomCodeContainer"
+                    class="room-code-container"
+                >
 
                     <span>
-                        لابی بازی
+                        کد اتاق
                     </span>
 
-                    <h1>
-                        اتاق انتظار
-                    </h1>
+                    <strong
+                        id="roomCode"
+                    >
+                        ------
+                    </strong>
+
+                    <button
+                        id="copyRoomCodeButton"
+                        type="button"
+                    >
+                        📋 کپی
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="playersContainer"
+                    class="players-container"
+                >
+
+                    <div class="player-seat" id="playerSeat1">
+                        <span>👤</span>
+                        <strong id="playerName1">
+                            انتظار بازیکن
+                        </strong>
+                    </div>
+
+                    <div class="player-seat" id="playerSeat2">
+                        <span>👤</span>
+                        <strong id="playerName2">
+                            انتظار بازیکن
+                        </strong>
+                    </div>
+
+                    <div class="player-seat" id="playerSeat3">
+                        <span>👤</span>
+                        <strong id="playerName3">
+                            انتظار بازیکن
+                        </strong>
+                    </div>
+
+                    <div class="player-seat" id="playerSeat4">
+                        <span>👤</span>
+                        <strong id="playerName4">
+                            انتظار بازیکن
+                        </strong>
+                    </div>
 
                 </div>
 
 
                 <button
-                    id="leaveRoomButton"
-                    class="danger-button"
+                    id="startRoomGameButton"
                     type="button"
+                    class="primary-action"
+                >
+                    شروع بازی 🎮
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             GAME SCREEN
+             ===================================================== -->
+        <section
+            id="gameScreen"
+            class="screen game-screen hidden"
+        >
+
+            <header
+                id="gameHeader"
+                class="game-header"
+            >
+
+                <div
+                    id="gameRoomInfo"
+                    class="game-room-info"
+                >
+                    اتاق:
+                    <strong id="gameRoomCode">
+                        ------
+                    </strong>
+                </div>
+
+
+                <div
+                    id="gameTurnInfo"
+                    class="game-turn-info"
+                >
+                    نوبت بازیکن
+                </div>
+
+
+                <button
+                    id="gameSettingsButton"
+                    type="button"
+                    class="icon-button"
+                >
+                    ⚙️
+                </button>
+
+            </header>
+
+
+            <!-- =================================================
+                 GREEN TABLE
+                 ================================================= -->
+            <div
+                id="gameTable"
+                class="game-table"
+            >
+
+                <!-- NORTH PLAYER -->
+                <div
+                    id="northPlayer"
+                    class="table-player table-player-north"
+                >
+                    <span class="player-avatar">
+                        👤
+                    </span>
+
+                    <span
+                        id="northPlayerName"
+                    >
+                        بازیکن
+                    </span>
+                </div>
+
+
+                <!-- WEST PLAYER -->
+                <div
+                    id="westPlayer"
+                    class="table-player table-player-west"
+                >
+                    <span class="player-avatar">
+                        👤
+                    </span>
+
+                    <span
+                        id="westPlayerName"
+                    >
+                        بازیکن
+                    </span>
+                </div>
+
+
+                <!-- EAST PLAYER -->
+                <div
+                    id="eastPlayer"
+                    class="table-player table-player-east"
+                >
+                    <span class="player-avatar">
+                        👤
+                    </span>
+
+                    <span
+                        id="eastPlayerName"
+                    >
+                        بازیکن
+                    </span>
+                </div>
+
+
+                <!-- CENTER -->
+                <div
+                    id="gameCenter"
+                    class="game-center"
+                >
+
+                    <div
+                        id="trumpDisplay"
+                        class="trump-display"
+                    >
+                        <span>
+                            حکم
+                        </span>
+
+                        <strong id="trumpSuit">
+                            -
+                        </strong>
+                    </div>
+
+
+                    <div
+                        id="trickArea"
+                        class="trick-area"
+                    >
+
+                        <div
+                            id="trickNorth"
+                            class="played-card-slot"
+                        ></div>
+
+                        <div
+                            id="trickWest"
+                            class="played-card-slot"
+                        ></div>
+
+                        <div
+                            id="trickEast"
+                            class="played-card-slot"
+                        ></div>
+
+                        <div
+                            id="trickSouth"
+                            class="played-card-slot"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- SOUTH / CURRENT PLAYER -->
+                <div
+                    id="southPlayer"
+                    class="table-player table-player-south"
+                >
+
+                    <div
+                        id="currentPlayerInfo"
+                        class="current-player-info"
+                    >
+
+                        <span class="player-avatar">
+                            👤
+                        </span>
+
+                        <span
+                            id="southPlayerName"
+                        >
+                            شما
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        id="handContainer"
+                        class="hand-container"
+                    >
+                        <!-- Cards are generated by game-ui.js -->
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 GAME ACTIONS
+                 ================================================= -->
+            <div
+                id="gameActionsPanel"
+                class="game-actions-panel"
+            >
+
+                <button
+                    id="selectTrumpButton"
+                    type="button"
+                    class="game-action-button"
+                >
+                    انتخاب حکم
+                </button>
+
+                <button
+                    id="passButton"
+                    type="button"
+                    class="game-action-button"
+                >
+                    پاس
+                </button>
+
+                <button
+                    id="leaveGameButton"
+                    type="button"
+                    class="game-action-button danger"
                 >
                     خروج
                 </button>
 
             </div>
 
-
-            <div
-                class="room-code-card"
-            >
-
-                <div>
-
-                    <small>
-                        کد اتاق
-                    </small>
-
-                    <strong
-                        id="currentRoomCode"
-                    >
-                        ------
-                    </strong>
-
-                </div>
-
-                <button
-                    id="copyRoomCodeButton"
-                    class="secondary-button"
-                    type="button"
-                >
-                    📋 کپی کد
-                </button>
-
-            </div>
-
-
-            <div
-                class="room-table"
-            >
-
-                <div
-                    id="roomPlayer1"
-                    class="room-player empty-player"
-                >
-                    <div
-                        class="room-player-avatar"
-                    >
-                        +
-                    </div>
-
-                    <div
-                        class="room-player-info"
-                    >
-
-                        <strong>
-                            جای خالی
-                        </strong>
-
-                        <span>
-                            منتظر بازیکن
-                        </span>
-
-                    </div>
-                </div>
-
-
-                <div
-                    id="roomPlayer2"
-                    class="room-player empty-player"
-                >
-                    <div
-                        class="room-player-avatar"
-                    >
-                        +
-                    </div>
-
-                    <div
-                        class="room-player-info"
-                    >
-
-                        <strong>
-                            جای خالی
-                        </strong>
-
-                        <span>
-                            منتظر بازیکن
-                        </span>
-
-                    </div>
-                </div>
-
-
-                <div
-                    id="roomPlayer3"
-                    class="room-player empty-player"
-                >
-                    <div
-                        class="room-player-avatar"
-                    >
-                        +
-                    </div>
-
-                    <div
-                        class="room-player-info"
-                    >
-
-                        <strong>
-                            جای خالی
-                        </strong>
-
-                        <span>
-                            منتظر بازیکن
-                        </span>
-
-                    </div>
-                </div>
-
-
-                <div
-                    id="roomPlayer4"
-                    class="room-player empty-player"
-                >
-                    <div
-                        class="room-player-avatar"
-                    >
-                        +
-                    </div>
-
-                    <div
-                        class="room-player-info"
-                    >
-
-                        <strong>
-                            جای خالی
-                        </strong>
-
-                        <span>
-                            منتظر بازیکن
-                        </span>
-
-                    </div>
-                </div>
-
-            </div>
-
-
-            <button
-                id="startGameButton"
-                class="primary-button start-game-button"
-                type="button"
-                disabled
-            >
-                ♠ شروع بازی
-            </button>
-
         </section>
-
-
-
-        <!-- =====================================================
-             TRUMP SCREEN
-        ====================================================== -->
-
-        <section
-            id="trumpScreen"
-            class="screen"
-        >
-
-            <div
-                class="trump-selection-card"
-            >
-
-                <div
-                    class="crown-icon"
-                >
-                    👑
-                </div>
-
-                <span>
-                    مرحله انتخاب حکم
-                </span>
-
-                <h1>
-                    حکم را انتخاب کن
-                </h1>
-
-                <p>
-                    یکی از چهار خال را به عنوان حکم انتخاب کن.
-                </p>
-
-
-                <div
-                    class="suit-grid"
-                >
-
-                    <button
-                        class="suit-button suit-hearts"
-                        data-suit="hearts"
-                        type="button"
-                    >
-
-                        <span>
-                            ♥
-                        </span>
-
-                        <strong>
-                            دل
-                        </strong>
-
-                    </button>
-
-
-                    <button
-                        class="suit-button suit-diamonds"
-                        data-suit="diamonds"
-                        type="button"
-                    >
-
-                        <span>
-                            ♦
-                        </span>
-
-                        <strong>
-                            خشت
-                        </strong>
-
-                    </button>
-
-
-                    <button
-                        class="suit-button suit-clubs"
-                        data-suit="clubs"
-                        type="button"
-                    >
-
-                        <span>
-                            ♣
-                        </span>
-
-                        <strong>
-                            گشنیز
-                        </strong>
-
-                    </button>
-
-
-                    <button
-                        class="suit-button suit-spades"
-                        data-suit="spades"
-                        type="button"
-                    >
-
-                        <span>
-                            ♠
-                        </span>
-
-                        <strong>
-                            پیک
-                        </strong>
-
-                    </button>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-
-        <!-- =====================================================
-             GAME SCREEN
-        ====================================================== -->
-
-        <section
-            id="gameScreen"
-            class="screen game-screen"
-        >
-
-
-            <!-- GAME TOP BAR -->
-
-            <div
-                class="game-top-bar"
-            >
-
-                <div
-                    class="game-team-score team-a"
-                >
-
-                    <span>
-                        تیم شما
-                    </span>
-
-                    <strong
-                        id="teamAScore"
-                    >
-                        0
-                    </strong>
-
-                </div>
-
-
-                <div
-                    class="game-status"
-                >
-
-                    <div
-                        class="trump-display"
-                    >
-
-                        <span>
-                            حکم
-                        </span>
-
-                        <strong
-                            id="trumpSuit"
-                        >
-                            -
-                        </strong>
-
-                    </div>
-
-
-                    <div
-                        id="turnMessage"
-                        class="turn-message"
-                    >
-                        آماده بازی
-                    </div>
-
-                </div>
-
-
-                <div
-                    class="game-team-score team-b"
-                >
-
-                    <span>
-                        حریف
-                    </span>
-
-                    <strong
-                        id="teamBScore"
-                    >
-                        0
-                    </strong>
-
-                </div>
-
-
-                <button
-                    id="gameMenuButton"
-                    class="game-menu-button"
-                    type="button"
-                    aria-label="منوی بازی"
-                >
-                    ☰
-                </button>
-
-            </div>
-
-
-
-            <!-- GAME TABLE -->
-
-            <div
-                class="game-table"
-            >
-
-
-                <!-- TOP PLAYER -->
-
-                <div
-                    class="table-player table-player-top"
-                >
-
-                    <div
-                        class="opponent-avatar"
-                    >
-                        🧑
-                    </div>
-
-                    <strong
-                        id="opponentTopName"
-                    >
-                        بازیکن
-                    </strong>
-
-                    <span>
-                        <b
-                            id="opponentTopCards"
-                        >
-                            13
-                        </b>
-                        کارت
-                    </span>
-
-                    <div
-                        class="opponent-cards-back top-card-back"
-                    >
-                        🂠
-                    </div>
-
-                </div>
-
-
-
-                <!-- LEFT PLAYER -->
-
-                <div
-                    class="table-player table-player-left"
-                >
-
-                    <div
-                        class="opponent-avatar"
-                    >
-                        🧑
-                    </div>
-
-                    <strong
-                        id="opponentLeftName"
-                    >
-                        بازیکن
-                    </strong>
-
-                    <span>
-                        <b
-                            id="opponentLeftCards"
-                        >
-                            13
-                        </b>
-                        کارت
-                    </span>
-
-                    <div
-                        class="opponent-cards-back side-card-back"
-                    >
-                        🂠
-                    </div>
-
-                </div>
-
-
-
-                <!-- RIGHT PLAYER -->
-
-                <div
-                    class="table-player table-player-right"
-                >
-
-                    <div
-                        class="opponent-avatar"
-                    >
-                        🧑
-                    </div>
-
-                    <strong
-                        id="opponentRightName"
-                    >
-                        بازیکن
-                    </strong>
-
-                    <span>
-                        <b
-                            id="opponentRightCards"
-                        >
-                            13
-                        </b>
-                        کارت
-                    </span>
-
-                    <div
-                        class="opponent-cards-back side-card-back"
-                    >
-                        🂠
-                    </div>
-
-                </div>
-
-
-
-                <!-- CENTER -->
-
-                <div
-                    class="table-center"
-                >
-
-                    <div
-                        id="playedCardTop"
-                        class="played-card-slot played-card-top"
-                    ></div>
-
-                    <div
-                        id="playedCardLeft"
-                        class="played-card-slot played-card-left"
-                    ></div>
-
-                    <div
-                        class="table-center-mark"
-                    >
-                        ♠
-                    </div>
-
-                    <div
-                        id="playedCardRight"
-                        class="played-card-slot played-card-right"
-                    ></div>
-
-                    <div
-                        id="playedCardBottom"
-                        class="played-card-slot played-card-bottom"
-                    ></div>
-
-                </div>
-
-
-
-                <!-- LOCAL PLAYER -->
-
-                <div
-                    class="table-player table-player-bottom"
-                >
-
-                    <div
-                        class="local-player-avatar"
-                    >
-                        👤
-                    </div>
-
-                    <strong>
-                        شما
-                    </strong>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- PLAYER HAND -->
-
-            <div
-                class="player-hand-section"
-            >
-
-                <div
-                    class="hand-title"
-                >
-                    کارت‌های شما
-                </div>
-
-                <div
-                    id="playerHand"
-                    class="player-hand"
-                ></div>
-
-            </div>
-
-
-
-            <!-- GAME ACTIONS -->
-
-            <div
-                class="game-actions"
-            >
-
-                <button
-                    id="gameChatButton"
-                    class="secondary-button"
-                    type="button"
-                >
-                    💬 چت
-                </button>
-
-            </div>
-
-        </section>
-
 
 
         <!-- =====================================================
              PROFILE SCREEN
-        ====================================================== -->
-
+             ===================================================== -->
         <section
             id="profileScreen"
-            class="screen"
+            class="screen profile-screen hidden"
         >
 
-            <div
-                class="page-header"
-            >
+            <header class="screen-header">
 
                 <button
-                    class="back-button"
-                    data-back="homeScreen"
+                    id="profileBackButton"
                     type="button"
                 >
                     ←
                 </button>
 
-                <div>
+                <h2>
+                    پروفایل
+                </h2>
 
-                    <span>
-                        حساب کاربری
-                    </span>
-
-                    <h1>
-                        پروفایل
-                    </h1>
-
-                </div>
-
-            </div>
+            </header>
 
 
             <div
-                class="profile-card"
+                id="profileContent"
+                class="profile-content"
             >
 
                 <div
-                    class="profile-avatar"
+                    id="profileAvatar"
+                    class="profile-avatar-large"
                 >
                     👤
                 </div>
@@ -1389,17 +909,53 @@
                     بازیکن مهمان
                 </h2>
 
-                <span>
-                    سطح
-                    <b id="profileLevel">
-                        1
-                    </b>
-                </span>
+                <p
+                    id="profileUsername"
+                >
+                    @guest
+                </p>
+
+
+                <div
+                    id="profileStats"
+                    class="profile-stats"
+                >
+
+                    <div>
+                        <strong id="profileWins">
+                            0
+                        </strong>
+
+                        <span>
+                            برد
+                        </span>
+                    </div>
+
+                    <div>
+                        <strong id="profileLosses">
+                            0
+                        </strong>
+
+                        <span>
+                            باخت
+                        </span>
+                    </div>
+
+                    <div>
+                        <strong id="profileGames">
+                            0
+                        </strong>
+
+                        <span>
+                            بازی
+                        </span>
+                    </div>
+
+                </div>
 
 
                 <button
                     id="editProfileButton"
-                    class="secondary-button"
                     type="button"
                 >
                     ✏️ ویرایش پروفایل
@@ -1407,647 +963,772 @@
 
             </div>
 
-
-            <div
-                class="profile-stats"
-            >
-
-                <div
-                    class="profile-stat"
-                >
-
-                    <strong
-                        id="gamesPlayed"
-                    >
-                        0
-                    </strong>
-
-                    <span>
-                        بازی
-                    </span>
-
-                </div>
-
-
-                <div
-                    class="profile-stat"
-                >
-
-                    <strong
-                        id="gamesWon"
-                    >
-                        0
-                    </strong>
-
-                    <span>
-                        برد
-                    </span>
-
-                </div>
-
-
-                <div
-                    class="profile-stat"
-                >
-
-                    <strong
-                        id="winRate"
-                    >
-                        0%
-                    </strong>
-
-                    <span>
-                        نرخ برد
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <button
-                id="logoutButton"
-                class="danger-button full-width"
-                type="button"
-            >
-                🚪 خروج / پاک کردن اطلاعات محلی
-            </button>
-
         </section>
-
 
 
         <!-- =====================================================
              SHOP SCREEN
-        ====================================================== -->
-
+             ===================================================== -->
         <section
             id="shopScreen"
-            class="screen"
+            class="screen shop-screen hidden"
         >
 
-            <div
-                class="page-header"
-            >
+            <header class="screen-header">
 
                 <button
-                    class="back-button"
-                    data-back="homeScreen"
+                    id="shopBackButton"
                     type="button"
                 >
                     ←
                 </button>
 
-                <div>
+                <h2>
+                    فروشگاه
+                </h2>
 
+                <div
+                    id="shopCoinBalance"
+                    class="coin-display"
+                >
+                    🪙
                     <span>
-                        فروشگاه
+                        3000
                     </span>
-
-                    <h1>
-                        فروشگاه بازی
-                    </h1>
-
                 </div>
 
-            </div>
+            </header>
 
 
             <div
-                class="shop-balance-card"
+                id="shopContent"
+                class="shop-content"
             >
 
-                <span>
-                    موجودی شما
-                </span>
-
-                <strong>
-                    🪙
-                    <span id="shopCoinBalance">
-                        ۱٬۰۰۰
-                    </span>
-                </strong>
-
-            </div>
-
-
-            <div
-                class="shop-grid"
-            >
-
-                <article
-                    class="shop-item"
+                <section
+                    id="shopItems"
+                    class="shop-items"
                 >
 
+                    <!-- Shop.js can populate this section -->
+
                     <div
-                        class="shop-item-icon"
+                        class="shop-item"
+                        data-item-id="extra_cards"
                     >
-                        🎨
+
+                        <div>
+                            🃏
+                        </div>
+
+                        <h3>
+                            کارت‌های ویژه
+                        </h3>
+
+                        <p>
+                            کارت‌های ظاهری ویژه برای بازی
+                        </p>
+
+                        <button
+                            type="button"
+                            class="shop-buy-button"
+                        >
+                            خرید
+                        </button>
+
                     </div>
 
-                    <h3>
-                        تم طلایی
-                    </h3>
 
-                    <p>
-                        ظاهر ویژه برای پروفایل
-                    </p>
-
-                    <button
-                        class="shop-buy-button primary-button"
-                        data-item="gold-theme"
-                        data-price="500"
-                        type="button"
+                    <div
+                        class="shop-item"
+                        data-item-id="table_theme"
                     >
-                        🪙 ۵۰۰
-                    </button>
 
-                </article>
+                        <div>
+                            🎨
+                        </div>
+
+                        <h3>
+                            تم میز
+                        </h3>
+
+                        <p>
+                            ظاهر متفاوت برای میز بازی
+                        </p>
+
+                        <button
+                            type="button"
+                            class="shop-buy-button"
+                        >
+                            خرید
+                        </button>
+
+                    </div>
 
 
-                <article
-                    class="shop-item"
+                    <div
+                        class="shop-item"
+                        data-item-id="avatar_frame"
+                    >
+
+                        <div>
+                            🖼️
+                        </div>
+
+                        <h3>
+                            قاب پروفایل
+                        </h3>
+
+                        <p>
+                            قاب ویژه برای پروفایل
+                        </p>
+
+                        <button
+                            type="button"
+                            class="shop-buy-button"
+                        >
+                            خرید
+                        </button>
+
+                    </div>
+
+                </section>
+
+
+                <section
+                    id="coinPackages"
+                    class="coin-packages"
                 >
 
-                    <div
-                        class="shop-item-icon"
-                    >
-                        👑
-                    </div>
-
-                    <h3>
-                        نشان قهرمان
-                    </h3>
-
-                    <p>
-                        نشان ویژه بازیکن
-                    </p>
-
-                    <button
-                        class="shop-buy-button primary-button"
-                        data-item="champion-badge"
-                        data-price="750"
-                        type="button"
-                    >
-                        🪙 ۷۵۰
-                    </button>
-
-                </article>
-
-
-                <article
-                    class="shop-item"
-                >
+                    <h2>
+                        خرید سکه
+                    </h2>
 
                     <div
-                        class="shop-item-icon"
+                        class="coin-package"
+                        data-coins="200"
+                        data-price="25000"
                     >
-                        ♠️
+                        <strong>
+                            🪙 ۲۰۰ سکه
+                        </strong>
+
+                        <span>
+                            ۲۵٬۰۰۰ تومان
+                        </span>
+
+                        <button
+                            type="button"
+                            class="buy-coins-button"
+                        >
+                            خرید
+                        </button>
                     </div>
 
-                    <h3>
-                        دسته کارت ویژه
-                    </h3>
-
-                    <p>
-                        ظاهر متفاوت کارت‌ها
-                    </p>
-
-                    <button
-                        class="shop-buy-button primary-button"
-                        data-item="special-cards"
-                        data-price="1000"
-                        type="button"
-                    >
-                        🪙 ۱٬۰۰۰
-                    </button>
-
-                </article>
-
-
-                <article
-                    class="shop-item"
-                >
 
                     <div
-                        class="shop-item-icon"
+                        class="coin-package"
+                        data-coins="600"
+                        data-price="40000"
                     >
-                        ✨
+                        <strong>
+                            🪙 ۶۰۰ سکه
+                        </strong>
+
+                        <span>
+                            ۴۰٬۰۰۰ تومان
+                        </span>
+
+                        <button
+                            type="button"
+                            class="buy-coins-button"
+                        >
+                            خرید
+                        </button>
                     </div>
 
-                    <h3>
-                        افکت پیروزی
-                    </h3>
 
-                    <p>
-                        افکت مخصوص هنگام برد
-                    </p>
-
-                    <button
-                        class="shop-buy-button primary-button"
-                        data-item="victory-effect"
-                        data-price="1500"
-                        type="button"
+                    <div
+                        class="coin-package"
+                        data-coins="1200"
+                        data-price="80000"
                     >
-                        🪙 ۱٬۵۰۰
-                    </button>
+                        <strong>
+                            🪙 ۱۲۰۰ سکه
+                        </strong>
 
-                </article>
+                        <span>
+                            ۸۰٬۰۰۰ تومان
+                        </span>
+
+                        <button
+                            type="button"
+                            class="buy-coins-button"
+                        >
+                            خرید
+                        </button>
+                    </div>
+
+                </section>
 
             </div>
 
         </section>
-
 
 
         <!-- =====================================================
              LEADERBOARD SCREEN
-        ====================================================== -->
-
+             ===================================================== -->
         <section
             id="leaderboardScreen"
-            class="screen"
+            class="screen leaderboard-screen hidden"
         >
 
-            <div
-                class="page-header"
-            >
+            <header class="screen-header">
 
                 <button
-                    class="back-button"
-                    data-back="homeScreen"
+                    id="leaderboardBackButton"
                     type="button"
                 >
                     ←
                 </button>
 
-                <div>
+                <h2>
+                    رتبه‌بندی
+                </h2>
 
-                    <span>
-                        رقابت
-                    </span>
-
-                    <h1>
-                        رتبه‌بندی
-                    </h1>
-
-                </div>
-
-            </div>
+            </header>
 
 
             <div
-                class="leaderboard-tabs"
-            >
-
-                <button
-                    class="leaderboard-tab active"
-                    type="button"
-                >
-                    هفتگی
-                </button>
-
-                <button
-                    class="leaderboard-tab"
-                    type="button"
-                >
-                    ماهانه
-                </button>
-
-                <button
-                    class="leaderboard-tab"
-                    type="button"
-                >
-                    همه زمان‌ها
-                </button>
-
-            </div>
-
-
-            <div
-                class="leaderboard-list"
+                id="leaderboardContent"
+                class="leaderboard-content"
             >
 
                 <div
-                    class="leaderboard-row first"
+                    id="leaderboardList"
+                    class="leaderboard-list"
                 >
-
-                    <span>
-                        🥇
-                    </span>
-
-                    <strong>
-                        بازیکن قهرمان
-                    </strong>
-
-                    <b>
-                        ۲٬۴۸۰
-                    </b>
-
-                </div>
-
-
-                <div
-                    class="leaderboard-row"
-                >
-
-                    <span>
-                        🥈
-                    </span>
-
-                    <strong>
-                        استاد حکم
-                    </strong>
-
-                    <b>
-                        ۲٬۲۱۰
-                    </b>
-
-                </div>
-
-
-                <div
-                    class="leaderboard-row"
-                >
-
-                    <span>
-                        🥉
-                    </span>
-
-                    <strong>
-                        بازیکن حرفه‌ای
-                    </strong>
-
-                    <b>
-                        ۲٬۰۵۰
-                    </b>
-
-                </div>
-
-
-                <div
-                    class="leaderboard-row"
-                >
-
-                    <span>
-                        4
-                    </span>
-
-                    <strong>
-                        بازیکن شرق
-                    </strong>
-
-                    <b>
-                        ۱٬۸۹۰
-                    </b>
-
-                </div>
-
-
-                <div
-                    class="leaderboard-row"
-                >
-
-                    <span>
-                        5
-                    </span>
-
-                    <strong>
-                        بازیکن شمال
-                    </strong>
-
-                    <b>
-                        ۱٬۷۵۰
-                    </b>
-
+                    <!-- leaderboard.js -->
                 </div>
 
             </div>
 
         </section>
 
-    </main>
 
-
-
-    <!-- =========================================================
-         BOTTOM NAVIGATION
-    ========================================================== -->
-
-    <nav
-        class="bottom-navigation"
-    >
-
-        <button
-            class="nav-item active"
-            data-screen="homeScreen"
-            type="button"
+        <!-- =====================================================
+             FRIENDS SCREEN
+             ===================================================== -->
+        <section
+            id="friendsScreen"
+            class="screen friends-screen hidden"
         >
 
-            <span>
-                🏠
-            </span>
+            <header class="screen-header">
 
-            <small>
-                خانه
-            </small>
+                <button
+                    id="friendsBackButton"
+                    type="button"
+                >
+                    ←
+                </button>
 
-        </button>
+                <h2>
+                    دوستان
+                </h2>
 
-
-        <button
-            class="nav-item"
-            data-screen="leaderboardScreen"
-            type="button"
-        >
-
-            <span>
-                🏆
-            </span>
-
-            <small>
-                رتبه‌بندی
-            </small>
-
-        </button>
+            </header>
 
 
-        <button
-            class="nav-item"
-            data-screen="shopScreen"
-            type="button"
-        >
-
-            <span>
-                🛍️
-            </span>
-
-            <small>
-                فروشگاه
-            </small>
-
-        </button>
-
-
-        <button
-            class="nav-item"
-            data-screen="profileScreen"
-            type="button"
-        >
-
-            <span>
-                👤
-            </span>
-
-            <small>
-                پروفایل
-            </small>
-
-        </button>
-
-    </nav>
-
-
-
-    <!-- =========================================================
-         TOAST
-    ========================================================== -->
-
-    <div
-        id="toast"
-        class="toast"
-        role="status"
-        aria-live="polite"
-    >
-
-        <span
-            id="toastIcon"
-            class="toast-icon"
-        >
-            ℹ️
-        </span>
-
-        <span
-            id="toastMessage"
-        >
-            پیام
-        </span>
-
-    </div>
-
-
-
-    <!-- =========================================================
-         MODAL
-    ========================================================== -->
-
-    <div
-        id="modalOverlay"
-        class="modal-overlay hidden"
-    >
-
-        <div
-            class="modal"
-            role="dialog"
-            aria-modal="true"
-        >
-
-            <button
-                id="closeModalButton"
-                class="modal-close-button"
-                type="button"
-                aria-label="بستن"
+            <div
+                id="friendsContent"
+                class="friends-content"
             >
-                ×
-            </button>
+
+                <div
+                    id="friendsList"
+                    class="friends-list"
+                >
+                    <!-- friends.js -->
+                </div>
+
+                <button
+                    id="addFriendButton"
+                    type="button"
+                >
+                    ＋ افزودن دوست
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             CHAT SCREEN
+             ===================================================== -->
+        <section
+            id="chatScreen"
+            class="screen chat-screen hidden"
+        >
+
+            <header class="screen-header">
+
+                <button
+                    id="chatBackButton"
+                    type="button"
+                >
+                    ←
+                </button>
+
+                <h2>
+                    چت
+                </h2>
+
+            </header>
+
 
             <div
-                id="modalContent"
-                class="modal-content"
-            ></div>
+                id="chatContent"
+                class="chat-content"
+            >
 
-        </div>
+                <div
+                    id="chatMessages"
+                    class="chat-messages"
+                >
+                    <!-- Chat.js -->
+                </div>
 
-    </div>
+
+                <form
+                    id="chatForm"
+                    class="chat-form"
+                >
+
+                    <input
+                        id="chatInput"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="پیامت را بنویس..."
+                    >
+
+                    <button
+                        id="sendChatButton"
+                        type="submit"
+                    >
+                        ارسال
+                    </button>
+
+                </form>
+
+            </div>
+
+        </section>
 
 
+        <!-- =====================================================
+             SETTINGS SCREEN
+             ===================================================== -->
+        <section
+            id="settingsScreen"
+            class="screen settings-screen hidden"
+        >
 
-    <!-- =========================================================
-         LOADING OVERLAY
-    ========================================================== -->
+            <header class="screen-header">
 
-    <div
-        id="loadingOverlay"
-        class="loading-overlay hidden"
-    >
+                <button
+                    id="settingsBackButton"
+                    type="button"
+                >
+                    ←
+                </button>
 
-        <div
-            class="loading-card"
+                <h2>
+                    تنظیمات
+                </h2>
+
+            </header>
+
+
+            <div
+                id="settingsContent"
+                class="settings-content"
+            >
+
+                <label class="setting-row">
+
+                    <span>
+                        🔊 صدا
+                    </span>
+
+                    <input
+                        id="soundSetting"
+                        type="checkbox"
+                        checked
+                    >
+
+                </label>
+
+
+                <label class="setting-row">
+
+                    <span>
+                        📳 لرزش
+                    </span>
+
+                    <input
+                        id="vibrationSetting"
+                        type="checkbox"
+                        checked
+                    >
+
+                </label>
+
+
+                <label class="setting-row">
+
+                    <span>
+                        🔔 اعلان‌ها
+                    </span>
+
+                    <input
+                        id="notificationSetting"
+                        type="checkbox"
+                        checked
+                    >
+
+                </label>
+
+
+                <button
+                    id="logoutButton"
+                    type="button"
+                    class="danger-button"
+                >
+                    خروج از حساب
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             NOTIFICATIONS SCREEN
+             ===================================================== -->
+        <section
+            id="notificationsScreen"
+            class="screen notifications-screen hidden"
+        >
+
+            <header class="screen-header">
+
+                <button
+                    id="notificationsBackButton"
+                    type="button"
+                >
+                    ←
+                </button>
+
+                <h2>
+                    اعلان‌ها
+                </h2>
+
+            </header>
+
+
+            <div
+                id="notificationsList"
+                class="notifications-list"
+            >
+                <!-- notifications.js -->
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             LOGIN / AUTH SCREEN
+             ===================================================== -->
+        <section
+            id="authScreen"
+            class="screen auth-screen hidden"
         >
 
             <div
-                class="loading-spinner"
+                id="authContent"
+                class="auth-content"
+            >
+
+                <div class="auth-logo">
+                    ♠️
+                </div>
+
+                <h1>
+                    حکم آنلاین
+                </h1>
+
+                <p>
+                    برای ادامه وارد حساب خود شو
+                </p>
+
+
+                <form
+                    id="loginForm"
+                >
+
+                    <input
+                        id="emailInput"
+                        type="email"
+                        autocomplete="email"
+                        placeholder="ایمیل"
+                    >
+
+                    <input
+                        id="passwordInput"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="رمز عبور"
+                    >
+
+                    <button
+                        id="loginButton"
+                        type="submit"
+                    >
+                        ورود
+                    </button>
+
+                </form>
+
+
+                <button
+                    id="guestLoginButton"
+                    type="button"
+                >
+                    ورود به‌عنوان مهمان
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             MODAL ROOT
+             ===================================================== -->
+        <div
+            id="modalRoot"
+            class="modal-root hidden"
+            aria-hidden="true"
+        >
+
+            <div
+                id="modalBackdrop"
+                class="modal-backdrop"
             ></div>
 
-            <strong>
-                <span id="loadingMessage">
-                    لطفاً صبر کنید...
-                </span>
-            </strong>
+            <div
+                id="modalContainer"
+                class="modal-container"
+            >
 
+                <button
+                    id="modalCloseButton"
+                    type="button"
+                    class="modal-close-button"
+                    aria-label="بستن"
+                >
+                    ×
+                </button>
+
+                <div
+                    id="modalContent"
+                    class="modal-content"
+                ></div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =====================================================
+             TOAST CONTAINER
+             ===================================================== -->
+        <div
+            id="toastContainer"
+            class="toast-container"
+            aria-live="polite"
+            aria-atomic="true"
+        ></div>
+
+
+        <!-- =====================================================
+             APP NOTIFICATION BADGE
+             ===================================================== -->
+        <div
+            id="notificationBadge"
+            class="notification-badge hidden"
+        >
+            0
         </div>
 
     </div>
 
 
-
     <!-- =========================================================
-         SUPABASE CLIENT
-         نسخه Browser/CDN
-    ========================================================== -->
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-        defer
-    ></script>
+         JAVASCRIPT FILES
+         IMPORTANT:
+         database.sql IS NOT LOADED HERE.
+         ========================================================= -->
 
 
-    <!-- =========================================================
-         PROJECT FILES
-         ترتیب این فایل‌ها مهم است.
-    ========================================================== -->
-
+    <!-- Configuration -->
     <script
         src="config.js"
         defer
     ></script>
 
+
+    <!-- Database helpers -->
     <script
         src="database.js"
         defer
     ></script>
 
+
+    <!-- Supabase client / integration -->
     <script
         src="supabase.js"
         defer
     ></script>
 
+
+    <!-- Authentication -->
     <script
         src="auth.js"
         defer
     ></script>
 
+
+    <!-- Profile -->
+    <script
+        src="profile.js"
+        defer
+    ></script>
+
+
+    <!-- Settings -->
+    <script
+        src="settings.js"
+        defer
+    ></script>
+
+
+    <!-- Wallet / coins -->
+    <script
+        src="wallet.js"
+        defer
+    ></script>
+
+
+    <!-- Notifications -->
+    <script
+        src="notifications.js"
+        defer
+    ></script>
+
+
+    <!-- Friends -->
+    <script
+        src="friends.js"
+        defer
+    ></script>
+
+
+    <!-- Leaderboard -->
+    <script
+        src="leaderboard.js"
+        defer
+    ></script>
+
+
+    <!-- Room management -->
+    <script
+        src="room.js"
+        defer
+    ></script>
+
+
+    <!-- Multiplayer -->
     <script
         src="multiplayer.js"
         defer
     ></script>
 
+
+    <!-- Chat -->
+    <script
+        src="Chat.js"
+        defer
+    ></script>
+
+
+    <!-- Core game -->
     <script
         src="game.js"
         defer
     ></script>
 
 
-</body>
+    <!-- Shop -->
+    <script
+        src="Shop.js"
+        defer
+    ></script>
 
-                </html>
+
+    <!-- UI -->
+    <script
+        src="ui.js"
+        defer
+    ></script>
+
+
+    <!-- Game UI -->
+    <script
+        src="game_ui.js"
+        defer
+    ></script>
+
+
+    <!-- Main application -->
+    <script
+        src="main.js"
+        defer
+    ></script>
+
+
+    <!-- =========================================================
+         SAFE FALLBACK
+         ========================================================= -->
+    <script>
+        window.addEventListener("load", function () {
+
+            setTimeout(function () {
+
+                const overlay =
+                    document.getElementById("loadingOverlay");
+
+                if (overlay) {
+                    overlay.classList.add("hidden");
+                }
+
+            }, 500);
+
+        });
+    </script>
+
+</body>
+</html>
